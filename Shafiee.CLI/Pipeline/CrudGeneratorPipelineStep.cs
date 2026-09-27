@@ -88,14 +88,30 @@ public class CrudGeneratorPipelineStep : IPipelineStep
             return Task.CompletedTask;
         }
 
-        string archName = "layered";
+        // پیش‌فرض را روی انترپرایز بگذاریم
+        string archName = "enterprise";
         string configPath = Path.Combine(solutionRoot, "shafiee.json");
+
         if (File.Exists(configPath))
         {
             var configContent = File.ReadAllText(configPath);
-            if (configContent.Contains("enterprise")) archName = "enterprise";
-            else if (configContent.Contains("clean")) archName = "clean";
+            if (configContent.Contains("clean")) archName = "clean";
             else if (configContent.Contains("microservice")) archName = "microservice";
+            else if (configContent.Contains("layered")) archName = "layered";
+            else if (configContent.Contains("enterprise")) archName = "enterprise";
+        }
+        else
+        {
+            // اگر فایل کانفیگ نبود، به طور خودکار آن را با پیش‌فرض انترپرایز ایجاد کن
+            try
+            {
+                string defaultConfig = "{\n  \"architecture\": \"enterprise\"\n}";
+                File.WriteAllText(configPath, defaultConfig);
+            }
+            catch
+            {
+                // در صورت بروز خطا در نوشتن فایل، خللی در روند اجرا ایجاد نکند
+            }
         }
 
         var arch = ArchitectureRegistry.Get(archName);
@@ -105,6 +121,8 @@ public class CrudGeneratorPipelineStep : IPipelineStep
             context.Diagnostics.Add(new Diagnostic($"Architecture '{archName}' not found.", DiagnosticSeverity.Error));
             return Task.CompletedTask;
         }
+
+        
 
         var allMetadata = new List<EntityMetadata>();
         var analyzer = new CodeAnalyzer();

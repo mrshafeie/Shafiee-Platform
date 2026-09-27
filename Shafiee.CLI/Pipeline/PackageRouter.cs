@@ -2,7 +2,7 @@
 
 using Shafiee.SDK.Commands;
 using Shafiee.SDK.Pipeline;
-using Shafiee.CLI.Writers; // اضافه کردن فضای نام نویسنده
+using Shafiee.CLI.Writers;
 
 public static class PackageRouter
 {
@@ -14,7 +14,12 @@ public static class PackageRouter
         if (command.Verb.Equals("new", StringComparison.OrdinalIgnoreCase) &&
             command.Resource.Equals("solution", StringComparison.OrdinalIgnoreCase))
         {
+            // ابتدا ساختار پوشه‌ها و پروژه‌ها ایجاد می‌شود
             steps.Add(new SolutionScaffoldPipelineStep());
+
+            // بلافاصله ارجاعات و Referenceهای بین پروژه‌ها به صورت اتوماتیک متصل می‌شوند
+           
+            steps.Add(new SolutionReferencePipelineStep());
         }
         // ۲. دستور تولید کد CRUD: shafiee generate crud Product
         else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
