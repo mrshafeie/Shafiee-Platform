@@ -1,10 +1,11 @@
-﻿namespace Shafiee.CLI.Pipeline;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Shafiee.SDK.Commands;
 using Shafiee.SDK.Pipeline;
 using Shafiee.CLI.Writers;
+using Shafiee.CLI.PipelineSteps;
+
+namespace Shafiee.CLI.Pipeline;
 
 public static class PackageRouter
 {
@@ -31,13 +32,13 @@ public static class PackageRouter
             // اضافه کردن مرحله نوشتن فایل‌ها روی دیسک به پایپ‌لاین
             steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
         }
-        // ۳. دستور تولید ساختار پروژه Shared: shafiee generate shared --solution Shop
+        // ۳. دستور تولید ساختار پروژه Shared: shafiee generate shared
+        // ۳. دستور تولید ساختار پروژه Shared: shafiee generate shared
         else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
                  command.Resource.Equals("shared", StringComparison.OrdinalIgnoreCase))
         {
             steps.Add(new SharedGeneratorPipelineStep());
         }
-
         return steps;
     }
 }
