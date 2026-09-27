@@ -130,7 +130,54 @@ public class SolutionScaffoldPipelineStep : IPipelineStep
             string targetDir = Path.Combine(rootDir, "src", "BuildingBlocks", projName);
             Directory.CreateDirectory(targetDir);
 
-            RunDotnetCommand($"new classlib -n {projName}", targetDir);
+            if (bb.Equals("Shared", StringComparison.OrdinalIgnoreCase))
+            {
+                // ایجاد فایل csproj اختصاصی و حرفه‌ای برای Shared
+                string csprojPath = Path.Combine(targetDir, $"{projName}.csproj");
+                string csprojContent = @"<Project Sdk=""Microsoft.NET.Sdk"">
+
+  <PropertyGroup>
+    <!-- Target Framework -->
+    <TargetFramework>net10.0</TargetFramework>
+
+    <!-- Language -->
+    <LangVersion>14.0</LangVersion>
+
+    <!-- Compiler -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Code Quality -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <!-- Documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Build -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
+
+  </PropertyGroup>
+
+</Project>";
+                File.WriteAllText(csprojPath, csprojContent);
+
+                // ایجاد فایل GlobalUsings.cs پایه برای Shared
+                string globalUsingsPath = Path.Combine(targetDir, "GlobalUsings.cs");
+                string globalUsingsContent = @"global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;
+";
+                File.WriteAllText(globalUsingsPath, globalUsingsContent);
+            }
+            else
+            {
+                RunDotnetCommand($"new classlib -n {projName}", targetDir);
+            }
+
             RegisterProjectToSolution(solutionFilePath, targetDir, projName, rootDir);
         }
 

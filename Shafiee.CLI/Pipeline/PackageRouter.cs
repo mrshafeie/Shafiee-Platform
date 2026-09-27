@@ -1,5 +1,7 @@
 ﻿namespace Shafiee.CLI.Pipeline;
 
+using System;
+using System.Collections.Generic;
 using Shafiee.SDK.Commands;
 using Shafiee.SDK.Pipeline;
 using Shafiee.CLI.Writers;
@@ -18,7 +20,6 @@ public static class PackageRouter
             steps.Add(new SolutionScaffoldPipelineStep());
 
             // بلافاصله ارجاعات و Referenceهای بین پروژه‌ها به صورت اتوماتیک متصل می‌شوند
-           
             steps.Add(new SolutionReferencePipelineStep());
         }
         // ۲. دستور تولید کد CRUD: shafiee generate crud Product
@@ -29,6 +30,12 @@ public static class PackageRouter
 
             // اضافه کردن مرحله نوشتن فایل‌ها روی دیسک به پایپ‌لاین
             steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
+        }
+        // ۳. دستور تولید ساختار پروژه Shared: shafiee generate shared --solution Shop
+        else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
+                 command.Resource.Equals("shared", StringComparison.OrdinalIgnoreCase))
+        {
+            steps.Add(new SharedGeneratorPipelineStep());
         }
 
         return steps;
