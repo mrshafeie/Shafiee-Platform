@@ -1,0 +1,68 @@
+﻿namespace {{ namespace }};
+
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using {{ namespace | string.replace ".Business.Contracts" ".Domain.Entities" }};
+using {{ namespace | string.replace ".Business.Contracts" ".Business.DTOs" }};
+
+public interface I{{ entity_name }}Service
+{
+    {{ entity_name }}? GetById(long id);
+
+    Task<{{ entity_name }}?> GetByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default);
+
+    {{ entity_name }}Dto? GetDtoById(long id);
+
+    Task<{{ entity_name }}Dto?> GetDtoByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default);
+
+    IReadOnlyList<{{ entity_name }}Dto> GetAll();
+
+    Task<IReadOnlyList<{{ entity_name }}Dto>> GetAllAsync(
+        CancellationToken cancellationToken = default);
+
+    {{ entity_name }}Dto? GetLast();
+
+    Task<{{ entity_name }}Dto?> GetLastAsync(
+        CancellationToken cancellationToken = default);
+
+    long Insert({{ entity_name }}Dto dto);
+
+    Task<long> InsertAsync(
+        {{ entity_name }}Dto dto,
+        CancellationToken cancellationToken = default);
+
+    void InsertMany(IEnumerable<{{ entity_name }}Dto> dtos);
+
+    Task InsertManyAsync(
+        IEnumerable<{{ entity_name }}Dto> dtos,
+        CancellationToken cancellationToken = default);
+
+    bool Update({{ entity_name }}Dto dto);
+
+    Task<bool> UpdateAsync(
+        {{ entity_name }}Dto dto,
+        CancellationToken cancellationToken = default);
+
+    void Delete(long id);
+
+    Task DeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default);
+
+    bool Delete({{ entity_name }}Dto dto);
+
+    Task<bool> DeleteAsync(
+        {{ entity_name }}Dto dto,
+        CancellationToken cancellationToken = default);
+
+    bool SoftDelete(long id);
+
+    Task<bool> SoftDeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default);
+}

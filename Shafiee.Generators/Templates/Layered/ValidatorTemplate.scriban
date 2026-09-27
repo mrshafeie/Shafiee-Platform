@@ -1,0 +1,37 @@
+﻿using FluentValidation;
+using {{ dto_namespace }};
+
+namespace {{ namespace }};
+
+public class {{ entity_name }}Validator : AbstractValidator<{{ entity_name }}Dto>
+{
+    public {{ entity_name }}Validator()
+    {
+        {{~ for prop in properties ~}}
+        {{~ prop_name = prop.name ?? prop.Name ~}}
+        {{~ prop_type = prop.type ?? prop.Type ~}}
+        {{~ is_nullable = prop.is_nullable ?? prop.IsNullable ~}}
+
+        {{~ if prop_name == "Id" || prop_name == "id" ~}}
+            {{~ continue ~}}
+        {{~ end ~}}
+
+        {{~ if prop_type == "string" || prop_type == "String" ~}}
+            {{~ if !is_nullable ~}}
+        RuleFor(x => x.{{ prop_name }})
+            .NotEmpty().WithMessage("The {{ prop_name }} field is required.")
+            .MaximumLength(250).WithMessage("The length of {{ prop_name }} cannot exceed 250 characters.");
+            {{~ else ~}}
+        RuleFor(x => x.{{ prop_name }})
+            .MaximumLength(250).WithMessage("The length of {{ prop_name }} cannot exceed 250 characters.");
+            {{~ end ~}}
+        {{~ else if prop_type == "int" || prop_type == "Int32" || prop_type == "long" || prop_type == "decimal" || prop_type == "double" ~}}
+            {{~ if !is_nullable ~}}
+        RuleFor(x => x.{{ prop_name }})
+            .NotNull().WithMessage("The {{ prop_name }} value must not be null.")
+            .GreaterThan(0).WithMessage("The {{ prop_name }} value must be greater than zero.");
+            {{~ end ~}}
+        {{~ end ~}}
+        {{~ end ~}}
+    }
+}

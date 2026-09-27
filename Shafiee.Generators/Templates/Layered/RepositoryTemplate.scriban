@@ -1,0 +1,82 @@
+﻿namespace {{ namespace }};
+
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using {{ entity_namespace }};
+using {{ context_namespace }};
+
+public interface I{{ entity_name }}Repository
+{
+    {{ entity_name }}? GetById(long id);
+    Task<{{ entity_name }}?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    IReadOnlyList<{{ entity_name }}> GetAll();
+    Task<IReadOnlyList<{{ entity_name }}>> GetAllAsync(CancellationToken cancellationToken = default);
+    void Add({{ entity_name }} entity);
+    Task AddAsync({{ entity_name }} entity, CancellationToken cancellationToken = default);
+    void AddRange(IEnumerable<{{ entity_name }}> entities);
+    Task AddRangeAsync(IEnumerable<{{ entity_name }}> entities, CancellationToken cancellationToken = default);
+    void Update({{ entity_name }} entity);
+    void Delete({{ entity_name }} entity);
+}
+
+public sealed class {{ entity_name }}Repository : I{{ entity_name }}Repository
+{
+    private readonly ApplicationEfContext _context;
+
+    public {{ entity_name }}Repository(ApplicationEfContext context)
+    {
+        _context = context;
+    }
+
+    public {{ entity_name }}? GetById(long id)
+    {
+        return _context.{{ entity_name }}s.Find(id);
+    }
+
+    public async Task<{{ entity_name }}?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+    {
+        return await _context.{{ entity_name }}s.FindAsync(new object[] { id }, cancellationToken);
+    }
+
+    public IReadOnlyList<{{ entity_name }}> GetAll()
+    {
+        return _context.{{ entity_name }}s.AsNoTracking().ToList();
+    }
+
+    public async Task<IReadOnlyList<{{ entity_name }}>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.{{ entity_name }}s.AsNoTracking().ToListAsync(cancellationToken);
+    }
+
+    public void Add({{ entity_name }} entity)
+    {
+        _context.{{ entity_name }}s.Add(entity);
+    }
+
+    public async Task AddAsync({{ entity_name }} entity, CancellationToken cancellationToken = default)
+    {
+        await _context.{{ entity_name }}s.AddAsync(entity, cancellationToken);
+    }
+
+    public void AddRange(IEnumerable<{{ entity_name }}> entities)
+    {
+        _context.{{ entity_name }}s.AddRange(entities);
+    }
+
+    public async Task AddRangeAsync(IEnumerable<{{ entity_name }}> entities, CancellationToken cancellationToken = default)
+    {
+        await _context.{{ entity_name }}s.AddRangeAsync(entities, cancellationToken);
+    }
+
+    public void Update({{ entity_name }} entity)
+    {
+        _context.{{ entity_name }}s.Update(entity);
+    }
+
+    public void Delete({{ entity_name }} entity)
+    {
+        _context.{{ entity_name }}s.Remove(entity);
+    }
+}

@@ -1,0 +1,8 @@
+﻿namespace {{ Namespace }};
+
+using MediatR;
+
+public class Get{{ Name }}ByIdQuery : IRequest<{{ Name }}Dto>
+{
+    public int Id { get; set; }
+}

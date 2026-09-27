@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Templates\ControllerTemplate.scriban" />
+    <Content Include="Templates\Layered\ControllerTemplate.scriban" />
+  </ItemGroup>
+	<ItemGroup>
+		<None Update="Templates\**\*.*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Scriban" Version="7.2.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shafiee.SDK\Shafiee.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Templates\CreateCommandTemplate.scriban">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Templates\DtoTemplate.scriban">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>DtoTemplate.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\Layered\DtoTemplate.scriban">
+      <Generator></Generator>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,32 @@
+﻿namespace {{ Namespace }};
+
+using MediatR;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class Create{{ Name }}CommandHandler : IRequestHandler<Create{{ Name }}Command, int>
+{
+    private readonly IApplicationDbContext _context;
+
+    public Create{{ Name }}CommandHandler(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<int> Handle(Create{{ Name }}Command request, CancellationToken cancellationToken)
+    {
+        var entity = new {{ Name }}
+        {
+{{~ for prop in Properties ~}}
+    {{~ if prop.Name != "Id" ~}}
+            {{ prop.Name }} = request.{{ prop.Name }},
+    {{~ end ~}}
+{{~ end ~}}
+        };
+
+        _context.{{ Name }}s.Add(entity);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return entity.Id;
+    }
+}

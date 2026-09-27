@@ -1,0 +1,29 @@
+﻿namespace {{ Namespace }};
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+public class {{ EntityName }}Configuration : IEntityTypeConfiguration<{{ EntityName }}>
+{
+    public void Configure(EntityTypeBuilder<{{ EntityName }}> builder)
+    {
+        builder.ToTable("{{ TableName }}");
+
+        {{~ if KeyPropName ~}}
+        builder.HasKey(x => x.{{ KeyPropName }});
+        {{~ end ~}}
+
+        {{~ for prop in Properties ~}}
+            {{~ if prop.Name != KeyPropName ~}}
+        builder.Property(x => x.{{ prop.Name }})
+                {{~ if !prop.IsNullable ~}}
+            .IsRequired()
+                {{~ end ~}}
+                {{~ if prop.Type == "decimal" || prop.Type == "Decimal" ~}}
+            .HasPrecision(18, 2)
+                {{~ end ~}}
+            ;
+            {{~ end ~}}
+        {{~ end ~}}
+    }
+}

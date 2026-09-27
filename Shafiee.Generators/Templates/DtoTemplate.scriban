@@ -1,0 +1,8 @@
+﻿namespace {{ Namespace }};
+
+public class {{ Name }}Dto
+{
+{{~ for prop in Properties ~}}
+    public {{ prop.Type }} {{ prop.Name }} { get; set; }
+{{~ end ~}}
+}

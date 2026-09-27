@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Analysis/">
+    <Project Path="Shafiee.Analysis/Shafiee.Analysis.csproj" Id="e567c54f-4fe9-415a-9a04-a14daa2990c6" />
+  </Folder>
+  <Folder Name="/Architectures/">
+    <Project Path="Shafiee.Architectures/Shafiee.Architectures.csproj" Id="b9123777-952f-4acd-9811-fb208c68da8e" />
+  </Folder>
+  <Folder Name="/CLI/">
+    <Project Path="Shafiee.CLI/Shafiee.CLI.csproj" Id="8b29537f-f70e-4121-8323-35d0b14d3fe5" />
+  </Folder>
+  <Folder Name="/Generators/">
+    <Project Path="Shafiee.Generators/Shafiee.Generators.csproj" Id="43170c26-d30b-42f5-b00f-7e611a07c25d" />
+  </Folder>
+  <Folder Name="/SDK/">
+    <Project Path="Shafiee.SDK/Shafiee.SDK.csproj" Id="95472d7e-00fc-46e1-b30d-23904d32c012" />
+  </Folder>
+</Solution>

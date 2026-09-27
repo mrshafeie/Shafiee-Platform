@@ -1,0 +1,15 @@
+﻿namespace {{ Namespace }};
+
+using FluentValidation;
+
+public class Create{{ EntityName }}CommandValidator : AbstractValidator<Create{{ EntityName }}Command>
+{
+    public Create{{ EntityName }}CommandValidator()
+    {
+{{~ for prop in Properties ~}}
+    {{~ if !prop.IsPrimaryKey && !prop.IsNullable ~}}
+        RuleFor(x => x.{{ prop.Name }}).NotEmpty();
+    {{~ end ~}}
+{{~ end ~}}
+    }
+}

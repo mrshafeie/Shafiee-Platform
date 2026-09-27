@@ -1,0 +1,55 @@
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using {{ entity_namespace }};
+
+namespace {{ namespace }};
+
+public class {{ entity_name }}Configuration : IEntityTypeConfiguration<{{ entity_name }}>
+{
+    public void Configure(EntityTypeBuilder<{{ entity_name }}> builder)
+    {
+        builder.ToTable("{{ entity_name | string.downcase }}s");
+
+        builder.HasKey(x => x.Id);
+
+        {{~ for prop in properties ~}}
+        {{~ prop_name = prop.name ?? prop.Name ~}}
+        {{~ prop_type = prop.type ?? prop.Type ~}}
+        {{~ is_nullable = prop.is_nullable ?? prop.IsNullable ~}}
+
+        {{~ if prop_name == "Id" || prop_name == "id" ~}}
+            {{~ continue ~}}
+        {{~ end ~}}
+
+        {{~ if prop_type == "string" || prop_type == "String" ~}}
+        builder.Property(x => x.{{ prop_name }})
+            {{~ if !is_nullable ~}}
+            .IsRequired()
+            {{~ end ~}}
+            .HasMaxLength(250);
+
+        {{~ else if prop_type == "decimal" || prop_type == "Decimal" ~}}
+        builder.Property(x => x.{{ prop_name }})
+            {{~ if !is_nullable ~}}
+            .IsRequired()
+            {{~ end ~}}
+            .HasPrecision(18, 2);
+
+        {{~ else if prop_type == "int" || prop_type == "Int32" || prop_type == "long" || prop_type == "Int64" ~}}
+        builder.Property(x => x.{{ prop_name }})
+            {{~ if !is_nullable ~}}
+            .IsRequired()
+            {{~ end ~}};
+
+        {{~ else if prop_type == "bool" || prop_type == "Boolean" ~}}
+        builder.Property(x => x.{{ prop_name }});
+
+        {{~ else if prop_type == "DateTime" || prop_type == "datetime" ~}}
+        builder.Property(x => x.{{ prop_name }})
+            {{~ if !is_nullable ~}}
+            .IsRequired()
+            {{~ end ~}};
+        {{~ end ~}}
+        {{~ end ~}}
+    }
+}

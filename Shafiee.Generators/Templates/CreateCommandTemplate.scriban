@@ -1,0 +1,13 @@
+﻿namespace {{ Namespace }};
+
+using MediatR;
+using System;
+
+public class Create{{ Name }}Command : IRequest<int>
+{
+{{~ for prop in Properties ~}}
+    {{~ if prop.Name != "Id" ~}}
+    public {{ prop.Type }} {{ prop.Name }} { get; set; }
+    {{~ end ~}}
+{{~ end ~}}
+}

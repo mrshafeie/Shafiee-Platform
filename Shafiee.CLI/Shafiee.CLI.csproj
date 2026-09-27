@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shafiee.Analysis\Shafiee.Analysis.csproj" />
+    <ProjectReference Include="..\Shafiee.Architectures\Shafiee.Architectures.csproj" />
+    <ProjectReference Include="..\Shafiee.Generators\Shafiee.Generators.csproj" />
+    <ProjectReference Include="..\Shafiee.SDK\Shafiee.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Commands\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Scriban" Version="7.2.6" />
+  </ItemGroup>
+	<PropertyGroup>
+		<PackAsTool>true</PackAsTool>
+		<ToolCommandName>shafiee</ToolCommandName>
+	</PropertyGroup>
+</Project>

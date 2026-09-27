@@ -1,0 +1,192 @@
+﻿namespace {{ namespace }};
+
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Linq;
+using {{ contracts_namespace }};
+using {{ dtos_namespace }};
+using {{ repositories_namespace }};
+using {{ unitofwork_namespace }};
+using {{ entity_namespace }};
+
+public sealed class {{ entity_name }}Service : I{{ entity_name }}Service
+{
+    private readonly I{{ entity_name }}Repository _repository;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public {{ entity_name }}Service(
+        I{{ entity_name }}Repository repository,
+        IUnitOfWork unitOfWork)
+    {
+        _repository = repository;
+        _unitOfWork = unitOfWork;
+    }
+
+    public {{ entity_name }}? GetById(long id)
+    {
+        return _repository.GetById(id);
+    }
+
+    public Task<{{ entity_name }}?> GetByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        return _repository.GetByIdAsync(id, cancellationToken);
+    }
+
+    public {{ entity_name }}Dto? GetDtoById(long id)
+    {
+        var entity = _repository.GetById(id);
+        return entity is null ? null : MapToDto(entity);
+    }
+
+    public async Task<{{ entity_name }}Dto?> GetDtoByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken);
+        return entity is null ? null : MapToDto(entity);
+    }
+
+    public async Task<IReadOnlyList<{{ entity_name }}Dto>> GetAllAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var entities = await _repository.GetAllAsync(cancellationToken);
+        return entities.Select(MapToDto).ToList();
+    }
+
+    public IReadOnlyList<{{ entity_name }}Dto> GetAll()
+    {
+        return _repository.GetAll().Select(MapToDto).ToList();
+    }
+
+    public long Insert({{ entity_name }}Dto dto)
+    {
+        var entity = MapToEntity(dto);
+        _repository.Add(entity);
+        _unitOfWork.SaveChanges();
+        return entity.Id;
+    }
+
+    public async Task<long> InsertAsync(
+        {{ entity_name }}Dto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = MapToEntity(dto);
+        await _repository.AddAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return entity.Id;
+    }
+
+    public void InsertMany(IEnumerable<{{ entity_name }}Dto> dtos)
+    {
+        var entities = dtos.Select(MapToEntity).ToList();
+        _repository.AddRange(entities);
+        _unitOfWork.SaveChanges();
+    }
+
+    public async Task InsertManyAsync(
+        IEnumerable<{{ entity_name }}Dto> dtos,
+        CancellationToken cancellationToken = default)
+    {
+        var entities = dtos.Select(MapToEntity).ToList();
+        await _repository.AddRangeAsync(entities, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public bool Update({{ entity_name }}Dto dto)
+    {
+        var entity = _repository.GetById(dto.Id);
+        if (entity is null) return false;
+
+        MapToEntity(dto, entity);
+        _repository.Update(entity);
+        return _unitOfWork.SaveChanges() > 0;
+    }
+
+    public async Task<bool> UpdateAsync(
+        {{ entity_name }}Dto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(dto.Id, cancellationToken);
+        if (entity is null) return false;
+
+        MapToEntity(dto, entity);
+        _repository.Update(entity);
+        return await _unitOfWork.SaveChangesAsync(cancellationToken) > 0;
+    }
+
+    public void Delete(long id)
+    {
+        var entity = _repository.GetById(id);
+        if (entity is null) return;
+
+        _repository.Delete(entity);
+        _unitOfWork.SaveChanges();
+    }
+
+    public async Task DeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken);
+        if (entity is null) return;
+
+        _repository.Delete(entity);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public bool SoftDelete(long id)
+    {
+        var entity = _repository.GetById(id);
+        if (entity is null) return false;
+
+        entity.IsActive = false;
+        _repository.Update(entity);
+        return _unitOfWork.SaveChanges() > 0;
+    }
+
+    public async Task<bool> SoftDeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken);
+        if (entity is null) return false;
+
+        entity.IsActive = false;
+        _repository.Update(entity);
+        return await _unitOfWork.SaveChangesAsync(cancellationToken) > 0;
+    }
+
+    private static {{ entity_name }}Dto MapToDto({{ entity_name }} entity)
+    {
+        return new {{ entity_name }}Dto
+        {
+            {{~ for prop in properties ~}}
+            {{ prop.Name }} = entity.{{ prop.Name }},
+            {{~ end ~}}
+        };
+    }
+
+    private static {{ entity_name }} MapToEntity({{ entity_name }}Dto dto)
+    {
+        return new {{ entity_name }}
+        {
+            {{~ for prop in properties ~}}
+            {{ prop.Name }} = dto.{{ prop.Name }},
+            {{~ end ~}}
+            CreatedAt = System.DateTime.UtcNow
+        };
+    }
+
+    private static void MapToEntity({{ entity_name }}Dto dto, {{ entity_name }} entity)
+    {
+        {{~ for prop in properties ~}}
+        {{~ if prop.Name != "Id" && prop.Name != "CreatedAt" ~}}
+        entity.{{ prop.Name }} = dto.{{ prop.Name }};
+        {{~ end ~}}
+        {{~ end ~}}
+        entity.UpdatedAt = System.DateTime.UtcNow;
+    }
+}
