@@ -90,6 +90,8 @@ public class Program
         Console.WriteLine("      dotnet run -- new solution hop --arch layered");
         Console.WriteLine("   2. Generate CRUD codes (fully automated):");
         Console.WriteLine("      dotnet run -- generate crud hop");
+        Console.WriteLine("   3. Generate Project Shared codes (fully automated):");
+        Console.WriteLine("      dotnet run -- shafiee generate shared");
         Console.WriteLine(new string('-', 50));
     }
 }
