@@ -15,6 +15,11 @@ public class SharedGeneratorPipelineStep : IPipelineStep
         string? solutionName = context.Command.GetOption("solution");
         if (string.IsNullOrEmpty(solutionName) || solutionName.Equals("shared", StringComparison.OrdinalIgnoreCase))
         {
+            solutionName = context.Command.Target;
+        }
+
+        if (string.IsNullOrWhiteSpace(solutionName))
+        {
             solutionName = "Shop";
         }
 
@@ -22,12 +27,12 @@ public class SharedGeneratorPipelineStep : IPipelineStep
         string solutionRoot = Path.Combine(desktopRoot, solutionName);
         string projectDir = Path.Combine(solutionRoot, "src", "BuildingBlocks", $"{solutionName}.BuildingBlocks.Shared", $"{solutionName}.BuildingBlocks.Shared");
 
-        var files = GetSharedSourceFiles(projectDir);
+        var files = GetSharedSourceFiles(solutionName);
 
         int successCount = 0;
         foreach (var file in files)
         {
-            string targetPath = file.Key;
+            string targetPath = Path.Combine(projectDir, file.Key);
             string? fileDir = Path.GetDirectoryName(targetPath);
 
             if (!string.IsNullOrEmpty(fileDir) && !Directory.Exists(fileDir))
@@ -45,16 +50,17 @@ public class SharedGeneratorPipelineStep : IPipelineStep
         return Task.CompletedTask;
     }
 
-    public static Dictionary<string, string> GetSharedSourceFiles(string projectDir)
+    public static Dictionary<string, string> GetSharedSourceFiles(string solutionName)
     {
+        var baseNamespace = $"{solutionName}.BuildingBlocks.Domain";
         return new Dictionary<string, string>
         {
              // ==========================================
             // GlobalUsings
             // ==========================================
-            {
-                Path.Combine(projectDir, "GlobalUsings.cs"),
-                """
+            
+                ["GlobalUsings.cs"]=
+               $$"""
                 global using System;
                 global using System.Collections.Generic;
                 global using System.Collections.ObjectModel;
@@ -63,15 +69,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                 global using System.Numerics;
                 global using System.Text;
                 """
-            },  
+            ,  
 
             // ==========================================
             // ABSTRACTIONS
             // ==========================================
-            {
-                Path.Combine(projectDir, "Abstractions", "IClock.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Abstractions;
+          [ "Abstractions/IClock.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Abstractions;
 
                 public interface IClock
                 {
@@ -80,12 +85,11 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     DateTimeOffset UtcNowOffset { get; }
                     DateTimeOffset NowOffset { get; }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Abstractions", "ICurrentUser.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Abstractions;
+                """,
+           
+               ["Abstractions/ICurrentUser.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Abstractions;
 
                 public interface ICurrentUser
                 {
@@ -95,12 +99,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     bool IsAuthenticated { get; }
                     IReadOnlyCollection<string> Roles { get; }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Abstractions", "IExecutionContext.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Abstractions;
+                """,
+            ["Abstractions/IExecutionContext.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Abstractions;
 
                 public interface IExecutionContext
                 {
@@ -110,27 +112,23 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     string? ClientIp { get; }
                     string? UserAgent { get; }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Abstractions", "IIdGenerator.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Abstractions;
+                """,
+            ["Abstractions/IIdGenerator.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Abstractions;
 
                 public interface IIdGenerator
                 {
                     Guid NewGuid();
                 }
-                """
-            },
+                """,
 
             // ==========================================
             // RESULTS
             // ==========================================
-            {
-                Path.Combine(projectDir, "Results", "ResultError.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Results;
+            [ "Results/ResultError.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Results;
 
                 /// <summary>
                 /// Represents a structured error returned by an operation.
@@ -184,12 +182,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     /// </summary>
                     public string? Field { get; }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Results", "Result.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Results;
+                """,
+           [ "Results/Result.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Results;
 
                 /// <summary>
                 /// Represents the outcome of an operation that does not return a value.
@@ -280,12 +276,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                             errors: errorList);
                     }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Results", "ResultT.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Results;
+                """,
+           ["Results/ResultT.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Results;
 
                 public sealed class Result<TValue> : Result
                 {
@@ -298,16 +292,15 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public new static Result<TValue> Failure(ResultError error) => new(new[] { error });
                     public new static Result<TValue> Failure(IEnumerable<ResultError> errors) => new(errors.ToArray());
                 }
-                """
-            },
+                """,
+            
             
             // ==========================================
             // Exceptions
             // ==========================================
-            {
-                Path.Combine(projectDir, "Exceptions", "BusinessException.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Exceptions;
+           ["Exceptions/BusinessException.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Exceptions;
 
                 /// <summary>
                 /// Represents an exception caused by a business rule violation.
@@ -342,12 +335,9 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     {
                     }
                 }
-                """
-            },   
-            {
-                Path.Combine(projectDir, "Exceptions", "ValidationException.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Exceptions;
+                """,
+            ["Exceptions/ValidationException.cs"]=$$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Exceptions;
 
                 /// <summary>
                 /// Represents one or more validation failures.
@@ -379,12 +369,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     /// </summary>
                     public IReadOnlyDictionary<string, string[]> Errors { get; }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Exceptions", "NotFoundException.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Exceptions;
+                """,
+             ["Exceptions/NotFoundException.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Exceptions;
 
                 /// <summary>
                 /// Represents an exception raised when a requested resource cannot be found.
@@ -426,11 +414,9 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public object ResourceId { get; }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Exceptions", "ConflictException.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Exceptions;
+            ,[ "Exceptions/ConflictException.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Exceptions;
 
                 /// <summary>
                 /// Represents an exception caused by a conflict with the current state of a resource.
@@ -470,12 +456,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         }
                     }
                 }
-                """
-            },
-            {
-                Path.Combine(projectDir, "Exceptions", "UnauthorizedException.cs"),
-                """
-                                namespace Project.BuildingBlocks.Shared.Exceptions;
+                """,
+           [ "Exceptions/UnauthorizedException.cs"]=
+                $$"""
+                                namespace {{baseNamespace}}.BuildingBlocks.Shared.Exceptions;
 
                 /// <summary>
                 /// Represents an authorization failure.
@@ -524,15 +508,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
                   
             // ==========================================
             // Models
             // ==========================================
-            {
-                Path.Combine(projectDir, "Models", "KeyValueModel.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Models;
+           ["Models/KeyValueModel.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Models;
 
                 /// <summary>
                 /// Represents a generic key-value pair model.
@@ -565,11 +548,9 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public TValue Value { get; init; }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Models", "SelectItemModel.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Models;
+           ,[ "Models/SelectItemModel.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Models;
 
                 /// <summary>
                 /// Represents an item that can be displayed and selected by a consumer.
@@ -616,11 +597,9 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public bool Selected { get; init; }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Models", "LookupModel.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Models;
+           ,[ "Models/LookupModel.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Models;
 
                 /// <summary>
                 /// Represents a lightweight lookup model containing an identifier and display name.
@@ -659,16 +638,15 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public string Name { get; init; }
                 }
                 """
-            },
+           
 
 
             // ==========================================
             // PAGINATION
             // ==========================================
-            {
-                Path.Combine(projectDir, "Pagination", "PageRequest.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Pagination;
+          ,[ "Pagination/PageRequest.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Pagination;
 
                 /// <summary>
                 /// Represents pagination parameters for a collection query.
@@ -752,11 +730,9 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Pagination", "PaginationMetadata.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Pagination;
+           ,[ "Pagination/PaginationMetadata.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Pagination;
 
                 /// <summary>
                 /// Contains metadata describing a paginated result.
@@ -854,11 +830,9 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Pagination", "PageResponse.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Pagination;
+            ,[ "Pagination/PageResponse.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Pagination;
 
                 /// <summary>
                 /// Represents a paginated collection response.
@@ -933,15 +907,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
 
             // ==========================================
             // EXTENSIONS
             // ==========================================
-            {
-                Path.Combine(projectDir, "Extensions", "StringExtensions.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Extensions;
+           ["Extensions/StringExtensions.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Extensions;
 
                 /// <summary>
                 /// Provides extension methods for string values.
@@ -1007,11 +980,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Extensions", "DateTimeExtensions.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Extensions;
+           ,
+            ["Extensions/DateTimeExtensions.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Extensions;
 
                 /// <summary>
                 /// Provides extension methods for date and time values.
@@ -1092,11 +1064,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Extensions", "EnumerableExtensions.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Extensions;
+            ,
+            [ "Extensions/EnumerableExtensions.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Extensions;
 
                 /// <summary>
                 /// Provides extension methods for enumerable collections.
@@ -1142,11 +1113,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Extensions", "EnumExtensions.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Extensions;
+            ,
+            ["Extensions/EnumExtensions.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Extensions;
 
                 /// <summary>
                 /// Provides extension methods for enumeration values.
@@ -1174,11 +1144,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Extensions", "ObjectExtensions.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Extensions;
+            ,
+            ["Extensions/ObjectExtensions.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Extensions;
 
                 /// <summary>
                 /// Provides extension methods for object values.
@@ -1204,11 +1173,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Extensions", "CollectionExtensions.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Extensions;
+            ,
+           ["Extensions/CollectionExtensions.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Extensions;
 
                 /// <summary>
                 /// Provides extension methods for mutable collections.
@@ -1267,17 +1235,16 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
              // ==========================================
             // HELPERS - Persian
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Persian", "PersianTextHelper.cs"),
-                """
-                ```csharp
+            ["Helpers/Persian/PersianTextHelper.cs"]=
+                $$"""
+              
                 using System.Text;
 
-                namespace Project.BuildingBlocks.Shared.Helpers.Persian;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Persian;
 
                 /// <summary>
                 /// Provides normalization and cleanup operations for Persian text.
@@ -1469,14 +1436,12 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         };
                     }
                 }
-                ```
+               
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Persian", "PersianDateHelper.cs"),
-                """
-                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Persian;
+            ,
+            ["Helpers/Persian/PersianDateHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Persian;
 
                 /// <summary>
                 /// Provides helper methods for working with the Persian calendar.
@@ -1773,15 +1738,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         return clone;
                     }
                 }
-                ```
+               
 
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Persian", "PersianCalendarHelper.cs"),
-                """
-                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Persian;
+            ,
+           ["Helpers/Persian/PersianCalendarHelper.cs"]=
+               $$"""
+               
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Persian;
 
                 /// <summary>
                 /// Provides higher-level calendar operations for the Persian calendar.
@@ -2098,16 +2062,15 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         }
                     }
                 }
-                ```
+                
                 """
-            },
+            ,
             // ==========================================
             // HELPERS - STRINGS
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Strings", "StringHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Strings;
+            ["Helpers/Strings/StringHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Strings;
 
                 using System;
                 using System.Collections.Generic;
@@ -2200,11 +2163,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Strings", "SlugHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Strings;
+            ,
+            ["Helpers/Strings/SlugHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Strings;
 
                 using System;
                 using System.Text;
@@ -2321,11 +2283,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     private static partial Regex MultipleSeparatorRegex();
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Strings", "TextNormalizer.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Strings;
+            ,
+            ["Helpers/Strings/TextNormalizer.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Strings;
 
                 using System;
                 using System.Text;
@@ -2425,16 +2386,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
                      
             // ==========================================
             // HELPERS - Numbers
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Numbers", "NumberHelper.cs"),
-                """
-                                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Numbers;
+            ["Helpers/Numbers/NumberHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Numbers;
 
                 /// <summary>
                 /// Provides general-purpose helper methods for working with numeric values.
@@ -2684,14 +2643,11 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         return Math.Abs(value) <= tolerance;
                     }
                 }
-                ```
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Numbers", "PersianNumberHelper.cs"),
-                """
-                                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Numbers;
+            ,
+            ["Helpers/Numbers/PersianNumberHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Numbers;
 
                 /// <summary>
                 /// Provides normalization and conversion helpers for Persian, Arabic,
@@ -2967,14 +2923,11 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         return builder.ToString();
                     }
                 }
-                ```
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Numbers", "NumberToWordsHelper.cs"),
-                """
-                                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Numbers;
+            ,
+            ["Helpers/Numbers/NumberToWordsHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Numbers;
 
                 /// <summary>
                 /// Provides conversion of numeric values to Persian words.
@@ -3240,18 +3193,15 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                             parts);
                     }
                 }
-                ```
                 """
-            },
+            ,
                
             // ==========================================
             // HELPERS - Files
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Files", "FileHelper.cs"),
-                """
-                                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Files;
+            ["Helpers/Files/FileHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Files;
 
                 /// <summary>
                 /// Provides general-purpose helpers for working with file paths,
@@ -3606,17 +3556,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         File.WriteAllText(path, content, encoding);
                     }
                 }
-                ```
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Files", "FileNameHelper.cs"),
-                """
-                                ```csharp id="x7k2qm"
+            ,
+           ["Helpers/Files/FileNameHelper.cs"]=
+                $$"""
                 using System.Security.Cryptography;
-                using Project.BuildingBlocks.Shared.Helpers.Strings;
+                using {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Strings;
 
-                namespace Project.BuildingBlocks.Shared.Helpers.Files;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Files;
 
                 /// <summary>
                 /// Provides helpers for sanitizing, generating, and validating file names.
@@ -4018,14 +3965,11 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         return baseName + extension;
                     }
                 }
-                ```
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Files", "FileSizeHelper.cs"),
-                """
-                                ```csharp
-                namespace Project.BuildingBlocks.Shared.Helpers.Files;
+            ,
+           ["Helpers/Files/FileSizeHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Files;
 
                 /// <summary>
                 /// Provides helpers for converting, formatting, and comparing file sizes.
@@ -4396,17 +4340,15 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     Gigabyte = 3,
                     Terabyte = 4
                 }
-                ```
                 """
-            },
+            ,
            
              // ==========================================
             // HELPERS - Images
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Images", "ImageHelper.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Helpers.Images;
+            ["Helpers/Images/ImageHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Images;
 
                 /// <summary>
                 /// Provides lightweight helpers for identifying and validating common
@@ -4776,11 +4718,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     Ico = 7
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Images", "ImageMetadataHelper.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Helpers.Images;
+            ,
+            ["Helpers/Images/ImageMetadataHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Images;
 
                 /// <summary>
                 /// Provides lightweight metadata extraction for common image formats.
@@ -5498,15 +5439,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                         ImageHelper.GetCanonicalExtension(Format);
                 }
                 """
-            },
+            ,
           
              // ==========================================
             // HELPERS - Urls
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Urls", "UrlHelper.cs"),
-                """
-                namespace Project.BuildingBlocks.Shared.Helpers.Urls;
+            ["Helpers/Urls/UrlHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Urls;
 
                 /// <summary>
                 /// Provides framework-independent helpers for working with URLs.
@@ -6112,12 +6052,11 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Images", "QueryStringHelper.cs"),
-                """
+            ,
+           ["Helpers/Images/QueryStringHelper.cs"]=
+                $$"""
                                 
-                namespace Project.BuildingBlocks.Shared.Helpers.Urls;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Urls;
 
                 /// <summary>
                 /// Provides framework-independent helpers for reading, building,
@@ -6578,17 +6517,16 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                 }
                 
                 """
-            },
+            ,
            
 
            
             // ==========================================
             // HELPERS - ENUMS
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Enums", "EnumHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Enums;
+            ["Helpers/Enums/EnumHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Enums;
 
                 using System;
                 using System.Collections.Generic;
@@ -6753,18 +6691,17 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
 
             // ==========================================
             // HELPERS - REFLECTION
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Reflection", "ReflectionHelper.cs"),
-                """
+            ["Helpers/Reflection/ReflectionHelper.cs"]=
+                $$"""
                                 
                 using System.Reflection;
 
-                namespace Project.BuildingBlocks.Shared.Helpers.Reflection;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Reflection;
 
                 /// <summary>
                 /// Provides lightweight, framework-independent helpers for working with
@@ -7494,16 +7431,15 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                 }
                 
                 """
-            },
+            ,
                 
 
             // ==========================================
             // HELPERS - SERIALIZATION
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Serialization", "JsonHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Serialization;
+            ["Helpers/Serialization/JsonHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Serialization;
 
                 using System;
                 using System.Text.Json;
@@ -7758,11 +7694,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Serialization", "SerializationHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Serialization;
+            ,
+            ["Helpers/Serialization/SerializationHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Serialization;
 
                 using System;
                 using System.Text;
@@ -7970,15 +7905,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
 
             // ==========================================
             // HELPERS - IDENTIFIERS
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Identifiers", "GuidHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Identifiers;
+            ["Helpers/Identifiers/GuidHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Identifiers;
 
                 using System;
 
@@ -8185,11 +8119,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Identifiers", "IdentifierHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Identifiers;
+            ,
+            ["Helpers/Identifiers/IdentifierHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Identifiers;
 
                 using System;
                 using System.Linq;
@@ -8540,15 +8473,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
 
             // ==========================================
             // HELPERS - MONEY & CURRENCY
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Money", "MoneyHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Money;
+            ["Helpers/Money/MoneyHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Money;
 
                 using System;
 
@@ -8650,11 +8582,10 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Money", "CurrencyHelper.cs"),
-                """
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Money;
+            ,
+            ["Helpers/Money/CurrencyHelper.cs"]=
+                $$"""
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Money;
 
                 using System;
 
@@ -8812,18 +8743,17 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public static decimal TomanToRial(decimal tomanAmount) => tomanAmount * 10m;
                 }
                 """
-            },
+            ,
 
             // ==========================================
             // HELPERS - NETWORKING
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Networking", "UserAgentHelper.cs"),
-                """
+            ["Helpers/Networking/UserAgentHelper.cs"]=
+                $$"""
                 using System;
                 using System.Text.RegularExpressions;
 
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Networking;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Networking;
 
                 public static partial class UserAgentHelper
                 {
@@ -9081,14 +9011,13 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                 public enum OperatingSystemFamily { Unknown = 0, Windows = 1, macOS = 2, Linux = 3, Android = 4, iOS = 5, ChromeOS = 6, WindowsPhone = 7 }
                 public enum DeviceType { Unknown = 0, Desktop = 1, Mobile = 2, Tablet = 3, Bot = 4 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Networking", "IpAddressHelper.cs"),
-                """
+            ,
+            [ "Helpers/Networking/IpAddressHelper.cs"]=
+                $$"""
                 using System.Net;
                 using System.Net.Sockets;
 
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Networking;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Networking;
 
                 public static class IpAddressHelper
                 {
@@ -9156,20 +9085,19 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public static string ToDisplayString(IPAddress? address) => address?.ToString() ?? string.Empty;
                 }
                 """
-            },
+            ,
 
             // ==========================================
             // HELPERS - HASHING & CHECKSUM
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Hashing", "ChecksumHelper.cs"),
-                """
+            [ "Helpers/Hashing/ChecksumHelper.cs"]=
+                $$"""
                 using System;
                 using System.Globalization;
                 using System.IO;
                 using System.Text;
 
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Hashing;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Hashing;
 
                 public static class ChecksumHelper
                 {
@@ -9212,15 +9140,14 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Hashing", "HashHelper.cs"),
-                """
+            ,
+            ["Helpers/Hashing/HashHelper.cs"]=
+                $$"""
                 using System;
                 using System.Security.Cryptography;
                 using System.Text;
 
-                namespace Shafiee.BuildingBlocks.Shared.Helpers.Hashing;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Hashing;
 
                 public static class HashHelper
                 {
@@ -9242,20 +9169,19 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
 
               // ==========================================
             // HELPERS - Environment
             // ==========================================
-            {
-                Path.Combine(projectDir, "Helpers", "Environment", "EnvironmentHelper.cs"),
-                """
+            ["Helpers/Environment/EnvironmentHelper.cs"]=
+                $$"""
                                 using System;
                 using System.Collections.Generic;
                 using System.Globalization;
                 using System.Linq;
 
-                namespace Project.BuildingBlocks.Shared.Helpers.Environment;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Environment;
 
                 /// <summary>
                 /// Provides framework-independent utilities for accessing process and
@@ -9635,14 +9561,13 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public string CurrentUICultureName { get; init; } = string.Empty;
                 }
                 """
-            },
-            {
-                Path.Combine(projectDir, "Helpers", "Environment", "OperatingSystemHelper.cs"),
-                """
+            ,
+            ["Helpers/Environment/OperatingSystemHelper.cs"]=
+                $$"""
                                 using System;
                 using System.Runtime.InteropServices;
 
-                namespace Project.BuildingBlocks.Shared.Helpers.Environment;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Helpers.Environment;
 
                 /// <summary>
                 /// Provides framework-independent utilities for detecting
@@ -9829,19 +9754,18 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     public bool Is64BitOperatingSystem { get; init; }
                 }
                 """
-            },
+            ,
             
               // ==========================================
             // Patterns - Guard
             // ==========================================
-            {
-                Path.Combine(projectDir, "Patterns", "Guard", "Guard.cs"),
-                """
+            ["Patterns/Guard/Guard.cs"]=
+                $$"""
                                 using System;
                 using System.Collections.Generic;
                 using System.Globalization;
 
-                namespace Project.BuildingBlocks.Shared.Patterns.Guard;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Patterns.Guard;
 
                 /// <summary>
                 /// Provides common guard clauses for validating method arguments,
@@ -10446,21 +10370,20 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     #endregion
                 }
                 """
-            },
+            ,
            
 
 
              // ==========================================
             // Patterns - Result
             // ==========================================
-            {
-                Path.Combine(projectDir, "Patterns", "Result", "ResultExtensions.cs"),
-                """
+            ["Patterns/Result/ResultExtensions.cs"]=
+                $$"""
                                 using System;
                 using System.Collections.Generic;
                 using System.Linq;
 
-                namespace Project.BuildingBlocks.Shared.Patterns.Result;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Patterns.Result;
 
                 public static class ResultExtensions
                 {
@@ -10819,19 +10742,18 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+            ,
              // ==========================================
             // Patterns - Specification
             // ==========================================
-            {
-                Path.Combine(projectDir, "Patterns", "Specification", "ISpecification.cs"),
-                """
+           ["Patterns/Specification/ISpecification.cs"]=
+                $$"""
                                 using System;
                 using System.Collections.Generic;
                 using System.Linq;
                 using System.Linq.Expressions;
 
-                namespace Project.BuildingBlocks.Shared.Patterns.Specification;
+                namespace {{baseNamespace}}.BuildingBlocks.Shared.Patterns.Specification;
 
                 public interface ISpecification<T>
                 {
@@ -11020,7 +10942,7 @@ public class SharedGeneratorPipelineStep : IPipelineStep
                     }
                 }
                 """
-            },
+          
             
 
         };

@@ -1,9 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Shafiee.CLI.PipelineSteps;
+using Shafiee.CLI.Writers;
+using Shafiee.CodeGenerator.Pipelines.Steps;
 using Shafiee.SDK.Commands;
 using Shafiee.SDK.Pipeline;
-using Shafiee.CLI.Writers;
-using Shafiee.CLI.PipelineSteps;
+using System;
+using System.Collections.Generic;
 
 namespace Shafiee.CLI.Pipeline;
 
@@ -32,13 +33,26 @@ public static class PackageRouter
             // اضافه کردن مرحله نوشتن فایل‌ها روی دیسک به پایپ‌لاین
             steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
         }
-        // ۳. دستور تولید ساختار پروژه Shared: shafiee generate shared
-        // ۳. دستور تولید ساختار پروژه Shared: shafiee generate shared
+        // ۳. دستور تولید پروژه Domain: shafiee generate domain Shop
+        else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
+                 command.Resource.Equals("domain", StringComparison.OrdinalIgnoreCase))
+        {
+            // مرحله ساخت فایل‌های دکشنری Domain
+            steps.Add(new DomainGeneratorPipelineStep());
+
+            // مرحله نوشتن فایل‌ها روی دیسک
+            steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
+        }
+        // ۴. دستور تولید ساختار پروژه Shared: shafiee generate shared
         else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
                  command.Resource.Equals("shared", StringComparison.OrdinalIgnoreCase))
         {
             steps.Add(new SharedGeneratorPipelineStep());
+
+            // اگر نیازمند ثبت روی دیسک است:
+            steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
         }
+
         return steps;
     }
 }

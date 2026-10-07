@@ -87,11 +87,13 @@ public class Program
     {
         Console.WriteLine("\n💡 Shafiee CLI Usage Guide:");
         Console.WriteLine("   1. Create a new solution:");
-        Console.WriteLine("      dotnet run -- new solution hop --arch layered");
+        Console.WriteLine("      dotnet run -- new solution ProjecName --arch layered");
         Console.WriteLine("   2. Generate CRUD codes (fully automated):");
-        Console.WriteLine("      dotnet run -- generate crud hop");
+        Console.WriteLine("      dotnet run -- generate crud ProjecName");
         Console.WriteLine("   3. Generate Project Shared codes (fully automated):");
-        Console.WriteLine("      dotnet run -- shafiee generate shared");
+        Console.WriteLine("      dotnet run -- shafiee generate shared ProjecName");
+        Console.WriteLine("   4. Generate Project Domain codes (fully automated):");
+        Console.WriteLine("       dotnet run -- shafiee generate domain");
         Console.WriteLine(new string('-', 50));
     }
 }
