@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Shafiee.CodeGenerator.Pipelines.Steps;
 
 public class ApplicationGeneratorPipelineStep : IPipelineStep
 {
