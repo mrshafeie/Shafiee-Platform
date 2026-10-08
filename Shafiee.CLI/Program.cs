@@ -94,6 +94,8 @@ public class Program
         Console.WriteLine("      dotnet run -- shafiee generate shared ProjecName");
         Console.WriteLine("   4. Generate Project Domain codes (fully automated):");
         Console.WriteLine("       dotnet run -- shafiee generate domain");
+        Console.WriteLine("   4. Generate Project Application codes (fully automated):");
+        Console.WriteLine("       dotnet run -- shafiee generate application");
         Console.WriteLine(new string('-', 50));
     }
 }

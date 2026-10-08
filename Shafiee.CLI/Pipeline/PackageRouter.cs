@@ -52,6 +52,15 @@ public static class PackageRouter
             // اگر نیازمند ثبت روی دیسک است:
             steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
         }
+        // ۴. دستور تولید ساختار پروژه Shared: shafiee generate shared
+        else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
+                 command.Resource.Equals("application", StringComparison.OrdinalIgnoreCase))
+        {
+            steps.Add(new ApplicationGeneratorPipelineStep());
+
+            // اگر نیازمند ثبت روی دیسک است:
+            steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
+        }
 
         return steps;
     }
