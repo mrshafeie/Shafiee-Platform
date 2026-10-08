@@ -61,6 +61,14 @@ public static class PackageRouter
             // اگر نیازمند ثبت روی دیسک است:
             steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
         }
+        else if (command.Verb.Equals("generate", StringComparison.OrdinalIgnoreCase) &&
+                 command.Resource.Equals("validation", StringComparison.OrdinalIgnoreCase))
+        {
+            steps.Add(new ValidationGeneratorPipelineStep());
+
+            // اگر نیازمند ثبت روی دیسک است:
+            steps.Add(new DiskWriterStep(new DiskArtifactWriter()));
+        }
 
         return steps;
     }

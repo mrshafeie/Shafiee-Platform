@@ -6,867 +6,1715 @@ using System.Threading;
 using System.Threading.Tasks;
 
 
-public class ApplicationGeneratorPipelineStep : IPipelineStep
+public sealed class ApplicationGeneratorPipelineStep : IPipelineStep
 {
-    public Task ExecuteAsync(PipelineContext context, CancellationToken cancellationToken = default)
+    public Task ExecuteAsync(
+        PipelineContext context,
+        CancellationToken cancellationToken = default)
     {
-        string? solutionName = context.Command.GetOption("solution");
+        ArgumentNullException.ThrowIfNull(context);
 
-        if (string.IsNullOrWhiteSpace(solutionName) || solutionName.Equals("application", StringComparison.OrdinalIgnoreCase))
-        {
-            solutionName = context.Command.Target;
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(solutionName))
-        {
-            solutionName = "Shop";
-        }
+        var solutionName = ResolveSolutionName(context);
+        var options = ResolveOptions(context);
 
-        bool includeCqrs = context.Command.GetOption("cqrs")?.Equals("false", StringComparison.OrdinalIgnoreCase) != true;
-        bool includeBehaviors = includeCqrs && (context.Command.GetOption("behaviors")?.Equals("false", StringComparison.OrdinalIgnoreCase) != true);
+        var solutionRoot = ResolveSolutionRoot(solutionName);
 
-        // تنظیمات سفارشی رفتارها
-        bool includeLogging = includeBehaviors && context.Command.GetOption("behavior-logging")?.Equals("false", StringComparison.OrdinalIgnoreCase) != true;
-        bool includePerformance = includeBehaviors && context.Command.GetOption("behavior-performance")?.Equals("false", StringComparison.OrdinalIgnoreCase) != true;
-        bool includeException = includeBehaviors && context.Command.GetOption("behavior-exception")?.Equals("false", StringComparison.OrdinalIgnoreCase) != true;
-        bool includeValidation = includeBehaviors && context.Command.GetOption("behavior-validation")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeAuthorization = includeBehaviors && context.Command.GetOption("behavior-authorization")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeTransaction = includeBehaviors && context.Command.GetOption("behavior-transaction")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeCaching = includeBehaviors && context.Command.GetOption("behavior-caching")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeRetry = includeBehaviors && context.Command.GetOption("behavior-retry")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeIdempotency = includeBehaviors && context.Command.GetOption("behavior-idempotency")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeAudit = includeBehaviors && context.Command.GetOption("behavior-audit")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        bool includeRateLimit = includeBehaviors && context.Command.GetOption("behavior-ratelimit")?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-
-        string desktopRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "ShafieeSolutions");
-        string solutionRoot = Path.Combine(desktopRoot, solutionName);
-        string projectDir = Path.Combine(solutionRoot, "src", "BuildingBlocks", $"{solutionName}.BuildingBlocks.Application");
+        var projectDirectory = Path.Combine(
+            solutionRoot,
+            "src",
+            "BuildingBlocks",
+            $"{solutionName}.BuildingBlocks.Application");
 
         var files = GetApplicationFilesDictionary(
             solutionName,
-            includeCqrs,
-            includeBehaviors,
-            includeLogging,
-            includePerformance,
-            includeException,
-            includeValidation,
-            includeAuthorization,
-            includeTransaction,
-            includeCaching,
-            includeRetry,
-            includeIdempotency,
-            includeAudit,
-            includeRateLimit);
+            options);
 
-        int successCount = 0;
+        var writtenCount = 0;
 
         foreach (var file in files)
         {
-            string targetPath = Path.Combine(projectDir, file.Key);
-            string? fileDir = Path.GetDirectoryName(targetPath);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (!string.IsNullOrEmpty(fileDir) && !Directory.Exists(fileDir))
+            var targetPath = Path.Combine(
+                projectDirectory,
+                file.Key);
+
+            var directory = Path.GetDirectoryName(targetPath);
+
+            if (!string.IsNullOrWhiteSpace(directory))
             {
-                Directory.CreateDirectory(fileDir);
+                Directory.CreateDirectory(directory);
             }
 
             File.WriteAllText(targetPath, file.Value);
-            Console.WriteLine($"✅ [Written] {targetPath}");
-            successCount++;
+
+            Console.WriteLine($"[Application] Written: {targetPath}");
+
+            writtenCount++;
         }
 
-        Console.WriteLine($"\n📊 [Application Disk Summary] Successfully wrote {successCount} application files directly to destination.");
+        Console.WriteLine(
+            $"[Application] Generated {writtenCount} file(s) for '{solutionName}'.");
 
         return Task.CompletedTask;
     }
 
+    private static string ResolveSolutionName(PipelineContext context)
+    {
+        var solutionName =
+            context.Command.GetOption("solution");
+
+        if (string.IsNullOrWhiteSpace(solutionName) ||
+            solutionName.Equals(
+                "application",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            solutionName = context.Command.Target;
+        }
+
+        return string.IsNullOrWhiteSpace(solutionName)
+            ? "Shop"
+            : solutionName.Trim();
+    }
+
+    private static string ResolveSolutionRoot(string solutionName)
+    {
+        var desktopRoot = Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.Desktop),
+            "ShafieeSolutions");
+
+        return Path.Combine(
+            desktopRoot,
+            solutionName);
+    }
+
+    private static ApplicationGenerationOptions ResolveOptions(
+        PipelineContext context)
+    {
+        return new ApplicationGenerationOptions
+        {
+            IncludeCqrs = IsEnabled(context, "cqrs", true),
+
+            IncludeBehaviors =
+                IsEnabled(context, "behaviors", true),
+
+            IncludeLoggingBehavior =
+                IsEnabled(context, "behavior-logging", true),
+
+            IncludePerformanceBehavior =
+                IsEnabled(context, "behavior-performance", true),
+
+            IncludeExceptionBehavior =
+                IsEnabled(context, "behavior-exception", true),
+
+            IncludeValidationBehavior =
+                IsEnabled(context, "behavior-validation", false),
+
+            IncludeAuthorizationBehavior =
+                IsEnabled(context, "behavior-authorization", false),
+
+            IncludeTransactionBehavior =
+                IsEnabled(context, "behavior-transaction", false),
+
+            IncludeCachingBehavior =
+                IsEnabled(context, "behavior-caching", false),
+
+            IncludeRetryBehavior =
+                IsEnabled(context, "behavior-retry", false),
+
+            IncludeIdempotencyBehavior =
+                IsEnabled(context, "behavior-idempotency", false),
+
+            IncludeAuditBehavior =
+                IsEnabled(context, "behavior-audit", false),
+
+            IncludeRateLimitBehavior =
+                IsEnabled(context, "behavior-ratelimit", false)
+        };
+    }
+
+    private static bool IsEnabled(
+        PipelineContext context,
+        string optionName,
+        bool defaultValue)
+    {
+        var value = context.Command.GetOption(optionName);
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        return !value.Equals(
+            "false",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     public Dictionary<string, string> GetApplicationFilesDictionary(
         string solutionName,
-        bool includeCqrs,
-        bool includeBehaviors,
-        bool includeLogging = true,
-        bool includePerformance = true,
-        bool includeException = true,
-        bool includeValidation = false,
-        bool includeAuthorization = false,
-        bool includeTransaction = false,
-        bool includeCaching = false,
-        bool includeRetry = false,
-        bool includeIdempotency = false,
-        bool includeAudit = false,
-        bool includeRateLimit = false)
+        ApplicationGenerationOptions options)
     {
-        var baseNamespace = $"{solutionName}.BuildingBlocks.Application";
+        ArgumentException.ThrowIfNullOrWhiteSpace(solutionName);
+        ArgumentNullException.ThrowIfNull(options);
 
-        var files = new Dictionary<string, string>
+        var baseNamespace =
+            $"{solutionName}.BuildingBlocks.Application";
+
+        var files =
+            new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+
+        AddCoreFiles(
+            files,
+            baseNamespace);
+
+        if (options.IncludeCqrs)
         {
-            ["GlobalUsings.cs"] =
-                $$"""
-                global using System;
-                global using System.Collections.Generic;
-                global using System.Diagnostics;
-                global using System.Linq;
-                global using System.Reflection;
-                global using System.Threading;
-                global using System.Threading.Tasks;
-                global using Microsoft.Extensions.DependencyInjection;
-                global using Microsoft.Extensions.Logging;
-                """,
+            AddCqrsFiles(
+                files,
+                baseNamespace);
 
-            #region Abstractions & Contracts
-            ["Abstractions/IApplicationService.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
+            AddDispatcherFiles(
+                files,
+                baseNamespace);
 
-                public interface IApplicationService
+            if (options.IncludeBehaviors)
+            {
+                AddBehaviorFiles(
+                    files,
+                    baseNamespace,
+                    options);
+            }
+
+            AddApplicationRegistrationFile(
+                files,
+                baseNamespace,
+                options);
+        }
+        else
+        {
+            AddMinimalApplicationRegistrationFile(
+                files,
+                baseNamespace);
+        }
+
+        return files;
+    }
+
+    private static void AddCoreFiles(
+        Dictionary<string, string> files,
+        string baseNamespace)
+    {
+        files["GlobalUsings.cs"] =
+            """
+            global using System;
+            global using System.Collections.Generic;
+            global using System.Diagnostics;
+            global using System.Linq;
+            global using System.Reflection;
+            global using System.Threading;
+            global using System.Threading.Tasks;
+
+            global using Microsoft.Extensions.DependencyInjection;
+            global using Microsoft.Extensions.Logging;
+            """;
+
+        files["Abstractions/IApplicationService.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Marker abstraction for application services.
+            /// </summary>
+            public interface IApplicationService
+            {
+            }
+            """;
+
+        files["Abstractions/IApplicationModule.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Describes an application module.
+            /// </summary>
+            public interface IApplicationModule
+            {
+                string Name { get; }
+
+                string Version { get; }
+            }
+            """;
+
+        /*
+         * IMPORTANT:
+         *
+         * IClock
+         * ICurrentUser
+         * IExecutionContext
+         * IIdGenerator
+         *
+         * intentionally DO NOT live here.
+         *
+         * They belong to BuildingBlocks.Shared.
+         */
+        files["Abstractions/ITransactionManager.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Application-level transaction abstraction.
+            ///
+            /// The concrete implementation belongs to Persistence/Infrastructure.
+            /// </summary>
+            public interface ITransactionManager
+            {
+                ValueTask BeginAsync(
+                    CancellationToken cancellationToken = default);
+
+                ValueTask CommitAsync(
+                    CancellationToken cancellationToken = default);
+
+                ValueTask RollbackAsync(
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Abstractions/ICacheService.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Application cache abstraction.
+            ///
+            /// Redis, memory cache or another provider belongs to Infrastructure.
+            /// </summary>
+            public interface ICacheService
+            {
+                ValueTask<T?> GetAsync<T>(
+                    string key,
+                    CancellationToken cancellationToken = default);
+
+                ValueTask SetAsync<T>(
+                    string key,
+                    T value,
+                    TimeSpan? expiration = null,
+                    CancellationToken cancellationToken = default);
+
+                ValueTask RemoveAsync(
+                    string key,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Abstractions/IAuthorizationService.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Application authorization abstraction.
+            ///
+            /// Actual authentication/authorization integration belongs
+            /// to Security/Identity infrastructure.
+            /// </summary>
+            public interface IAuthorizationService
+            {
+                ValueTask<bool> AuthorizeAsync(
+                    string? policy,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Abstractions/IIdempotencyStore.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Stores request execution results for idempotent operations.
+            /// </summary>
+            public interface IIdempotencyStore
+            {
+                ValueTask<bool> ExistsAsync(
+                    string key,
+                    CancellationToken cancellationToken = default);
+
+                ValueTask StoreAsync(
+                    string key,
+                    TimeSpan? expiration = null,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Abstractions/IAuditWriter.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Application audit abstraction.
+            /// </summary>
+            public interface IAuditWriter
+            {
+                ValueTask WriteAsync(
+                    string action,
+                    object? data = null,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Abstractions/IRateLimitService.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Application-level rate limiting abstraction.
+            /// </summary>
+            public interface IRateLimitService
+            {
+                ValueTask<bool> IsAllowedAsync(
+                    string key,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Abstractions/IRetryPolicy.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            /// <summary>
+            /// Determines whether an operation should be retried.
+            ///
+            /// The implementation decides which failures are transient.
+            /// </summary>
+            public interface IRetryPolicy
+            {
+                ValueTask<T> ExecuteAsync<T>(
+                    Func<CancellationToken, ValueTask<T>> operation,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+    }
+
+    private static void AddCqrsFiles(
+        Dictionary<string, string> files,
+        string baseNamespace)
+    {
+        files["CQRS/Common/Unit.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Common;
+
+            /// <summary>
+            /// Represents a void application result.
+            /// </summary>
+            public readonly struct Unit : IEquatable<Unit>
+            {
+                public static readonly Unit Value = new();
+
+                public bool Equals(Unit other)
+                    => true;
+
+                public override bool Equals(object? obj)
+                    => obj is Unit;
+
+                public override int GetHashCode()
+                    => 0;
+
+                public override string ToString()
+                    => "()";
+
+                public static bool operator ==(
+                    Unit left,
+                    Unit right)
+                    => true;
+
+                public static bool operator !=(
+                    Unit left,
+                    Unit right)
+                    => false;
+            }
+            """;
+
+        files["CQRS/Commands/ICommand.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Commands;
+
+            public interface ICommand
+            {
+            }
+            """;
+
+        files["CQRS/Commands/ICommand{TResult}.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Commands;
+
+            public interface ICommand<out TResult> : ICommand
+            {
+            }
+            """;
+
+        files["CQRS/Commands/ICommandHandler.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Commands;
+
+            public interface ICommandHandler<in TCommand>
+                where TCommand : ICommand
+            {
+                ValueTask HandleAsync(
+                    TCommand command,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["CQRS/Commands/ICommandHandler{TCommand,TResult}.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Commands;
+
+            public interface ICommandHandler<
+                in TCommand,
+                TResult>
+                where TCommand : ICommand<TResult>
+            {
+                ValueTask<TResult> HandleAsync(
+                    TCommand command,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["CQRS/Queries/IQuery.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Queries;
+
+            public interface IQuery
+            {
+            }
+            """;
+
+        files["CQRS/Queries/IQuery{TResult}.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Queries;
+
+            public interface IQuery<out TResult> : IQuery
+            {
+            }
+            """;
+
+        files["CQRS/Queries/IQueryHandler.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Queries;
+
+            public interface IQueryHandler<in TQuery>
+                where TQuery : IQuery
+            {
+                ValueTask HandleAsync(
+                    TQuery query,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["CQRS/Queries/IQueryHandler{TQuery,TResult}.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Queries;
+
+            public interface IQueryHandler<
+                in TQuery,
+                TResult>
+                where TQuery : IQuery<TResult>
+            {
+                ValueTask<TResult> HandleAsync(
+                    TQuery query,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["CQRS/Events/IEvent.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Events;
+
+            public interface IEvent
+            {
+                DateTime OccurredOn { get; }
+            }
+            """;
+
+        files["CQRS/Events/IEventHandler.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.CQRS.Events;
+
+            public interface IEventHandler<in TEvent>
+                where TEvent : IEvent
+            {
+                ValueTask HandleAsync(
+                    TEvent @event,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+    }
+
+    private static void AddDispatcherFiles(
+        Dictionary<string, string> files,
+        string baseNamespace)
+    {
+        files["Abstractions/ICommandDispatcher.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            using {{baseNamespace}}.CQRS.Commands;
+
+            public interface ICommandDispatcher
+            {
+                ValueTask SendAsync<TCommand>(
+                    TCommand command,
+                    CancellationToken cancellationToken = default)
+                    where TCommand : ICommand;
+
+                ValueTask<TResult> SendAsync<TCommand, TResult>(
+                    TCommand command,
+                    CancellationToken cancellationToken = default)
+                    where TCommand : ICommand<TResult>;
+            }
+            """;
+
+        files["Abstractions/IQueryDispatcher.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            using {{baseNamespace}}.CQRS.Queries;
+
+            public interface IQueryDispatcher
+            {
+                ValueTask SendAsync<TQuery>(
+                    TQuery query,
+                    CancellationToken cancellationToken = default)
+                    where TQuery : IQuery;
+
+                ValueTask<TResult> SendAsync<TQuery, TResult>(
+                    TQuery query,
+                    CancellationToken cancellationToken = default)
+                    where TQuery : IQuery<TResult>;
+            }
+            """;
+
+        files["Abstractions/IEventPublisher.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            using {{baseNamespace}}.CQRS.Events;
+
+            public interface IEventPublisher
+            {
+                ValueTask PublishAsync<TEvent>(
+                    TEvent @event,
+                    CancellationToken cancellationToken = default)
+                    where TEvent : IEvent;
+            }
+            """;
+
+        files["Abstractions/IApplicationDispatcher.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Abstractions;
+
+            public interface IApplicationDispatcher :
+                ICommandDispatcher,
+                IQueryDispatcher,
+                IEventPublisher
+            {
+            }
+            """;
+
+        files["Pipelines/IPipelineBehavior.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Pipelines;
+
+            public interface IPipelineBehavior<in TRequest, TResponse>
+            {
+                ValueTask<TResponse> HandleAsync(
+                    TRequest request,
+                    Func<ValueTask<TResponse>> next,
+                    CancellationToken cancellationToken = default);
+            }
+            """;
+
+        files["Pipelines/Attributes/AuthorizeAttribute.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Pipelines.Attributes;
+
+            [AttributeUsage(
+                AttributeTargets.Class,
+                AllowMultiple = true,
+                Inherited = true)]
+            public sealed class AuthorizeAttribute : Attribute
+            {
+                public AuthorizeAttribute()
                 {
                 }
-                """,
 
-            ["Abstractions/ITransactionManager.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface ITransactionManager
+                public AuthorizeAttribute(string policy)
                 {
-                    ValueTask BeginAsync(CancellationToken cancellationToken = default);
-                    ValueTask CommitAsync(CancellationToken cancellationToken = default);
-                    ValueTask RollbackAsync(CancellationToken cancellationToken = default);
+                    Policy = policy;
                 }
-                """,
 
-            ["Abstractions/IIdGenerator.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
+                public string? Roles { get; init; }
 
-                public interface IIdGenerator
+                public string? Policy { get; init; }
+            }
+            """;
+
+        files["Pipelines/Attributes/CacheableAttribute.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Pipelines.Attributes;
+
+            [AttributeUsage(
+                AttributeTargets.Class,
+                AllowMultiple = false,
+                Inherited = true)]
+            public sealed class CacheableAttribute : Attribute
+            {
+                public CacheableAttribute(
+                    int durationInSeconds = 60)
                 {
-                    Guid NewGuid();
-                    string NewString();
-                }
-                """,
-
-            ["Abstractions/IDateTimeProvider.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface IDateTimeProvider
-                {
-                    DateTime UtcNow { get; }
-                    DateTime LocalNow { get; }
-                }
-                """,
-
-            ["Abstractions/IApplicationModule.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface IApplicationModule
-                {
-                    string Name { get; }
-                    string Version { get; }
-                }
-                """,
-
-            ["Abstractions/ICacheService.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface ICacheService
-                {
-                    ValueTask<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
-                    ValueTask SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken cancellationToken = default);
-                    ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default);
-                }
-                """,
-
-            ["Abstractions/ICurrentUser.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface ICurrentUser
-                {
-                    string? Id { get; }
-                    string? UserName { get; }
-                    bool IsAuthenticated { get; }
-                    IEnumerable<string> Roles { get; }
-                    bool HasRole(string role);
-                }
-                """,
-            #endregion
-
-            #region Common Services Implementation
-            ["Services/SystemDateTimeProvider.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Services;
-
-                using {{baseNamespace}}.Abstractions;
-
-                public class SystemDateTimeProvider : IDateTimeProvider
-                {
-                    public DateTime UtcNow => DateTime.UtcNow;
-                    public DateTime LocalNow => DateTime.Now;
-                }
-                """,
-
-            ["Services/GuidIdGenerator.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Services;
-
-                using {{baseNamespace}}.Abstractions;
-
-                public class GuidIdGenerator : IIdGenerator
-                {
-                    public Guid NewGuid() => Guid.NewGuid();
-                    public string NewString() => Guid.NewGuid().ToString("N");
-                }
-                """,
-            #endregion
-
-            #region CQRS Base Interfaces
-            ["CQRS/Common/Unit.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.CQRS.Common;
-
-                public readonly struct Unit : IEquatable<Unit>
-                {
-                    public static readonly Unit Value = new();
-                    public override string ToString() => "()";
-                    public bool Equals(Unit other) => true;
-                    public override bool Equals(object? obj) => obj is Unit;
-                    public override int GetHashCode() => 0;
-                    public static bool operator ==(Unit left, Unit right) => true;
-                    public static bool operator !=(Unit left, Unit right) => false;
-                }
-                """,
-
-            ["CQRS/Commands/ICommand.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Commands;\n\npublic interface ICommand { }""",
-            ["CQRS/Commands/ICommand{TResult}.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Commands;\n\npublic interface ICommand<out TResult> : ICommand { }""",
-            ["CQRS/Commands/ICommandHandler.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Commands;\n\npublic interface ICommandHandler<in TCommand> where TCommand : ICommand { ValueTask HandleAsync(TCommand command, CancellationToken cancellationToken = default); }""",
-            ["CQRS/Commands/ICommandHandler{TCommand,TResult}.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Commands;\n\npublic interface ICommandHandler<in TCommand, TResult> where TCommand : ICommand<TResult> { ValueTask<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken = default); }""",
-
-            ["CQRS/Queries/IQuery.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Queries;\n\npublic interface IQuery { }""",
-            ["CQRS/Queries/IQuery{TResult}.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Queries;\n\npublic interface IQuery<out TResult> : IQuery { }""",
-            ["CQRS/Queries/IQueryHandler.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Queries;\n\npublic interface IQueryHandler<in TQuery> where TQuery : IQuery { ValueTask HandleAsync(TQuery query, CancellationToken cancellationToken = default); }""",
-            ["CQRS/Queries/IQueryHandler{TQuery,TResult}.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Queries;\n\npublic interface IQueryHandler<in TQuery, TResult> where TQuery : IQuery<TResult> { ValueTask<TResult> HandleAsync(TQuery query, CancellationToken cancellationToken = default); }""",
-
-            ["CQRS/Events/IEvent.cs"] = $$"""namespace {{baseNamespace}}.CQRS.Events;\n\npublic interface IEvent { DateTime OccurredOn { get; } }""",
-            ["CQRS/Events/IEventHandler.cs"] = $$"""namespace {baseNamespace}.CQRS.Events;\n\npublic interface IEventHandler<in TEvent> where TEvent : IEvent { ValueTask HandleAsync(TEvent @event, CancellationToken cancellationToken = default); }""",
-            #endregion
-
-            #region Dispatchers & Pipeline Abstractions
-            ["Abstractions/ICommandDispatcher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface ICommandDispatcher
-                {
-                    ValueTask SendAsync<TCommand>(TCommand command, CancellationToken cancellationToken = default) where TCommand : CQRS.Commands.ICommand;
-                    ValueTask<TResult> SendAsync<TCommand, TResult>(TCommand command, CancellationToken cancellationToken = default) where TCommand : CQRS.Commands.ICommand<TResult>;
-                }
-                """,
-
-            ["Abstractions/IQueryDispatcher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface IQueryDispatcher
-                {
-                    ValueTask SendAsync<TQuery>(TQuery query, CancellationToken cancellationToken = default) where TQuery : CQRS.Queries.IQuery;
-                    ValueTask<TResult> SendAsync<TQuery, TResult>(TQuery query, CancellationToken cancellationToken = default) where TQuery : CQRS.Queries.IQuery<TResult>;
-                }
-                """,
-
-            ["Abstractions/IEventPublisher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface IEventPublisher
-                {
-                    ValueTask PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : CQRS.Events.IEvent;
-                }
-                """,
-
-            ["Abstractions/IApplicationDispatcher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Abstractions;
-
-                public interface IApplicationDispatcher : ICommandDispatcher, IQueryDispatcher, IEventPublisher
-                {
-                }
-                """,
-
-            ["Pipelines/IPipelineBehavior.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines;
-
-                public interface IPipelineBehavior<in TRequest, TResponse>
-                {
-                    ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default);
-                }
-                """,
-
-            ["Pipelines/IValidator.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines;
-
-                public interface IValidator<in T>
-                {
-                    ValueTask ValidateAsync(T instance, CancellationToken cancellationToken = default);
-                }
-                """,
-
-            ["Pipelines/Attributes/AuthorizeAttribute.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines.Attributes;
-
-                [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
-                public class AuthorizeAttribute : Attribute
-                {
-                    public string? Roles { get; set; }
-                    public string? Policy { get; set; }
-                }
-                """,
-
-            ["Pipelines/Attributes/CacheableAttribute.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines.Attributes;
-
-                [AttributeUsage(AttributeTargets.Class, Inherited = true)]
-                public class CacheableAttribute : Attribute
-                {
-                    public int DurationInSeconds { get; }
-                    public string? CacheKeyPrefix { get; set; }
-
-                    public CacheableAttribute(int durationInSeconds = 60)
+                    if (durationInSeconds <= 0)
                     {
-                        DurationInSeconds = durationInSeconds;
+                        throw new ArgumentOutOfRangeException(
+                            nameof(durationInSeconds));
                     }
+
+                    DurationInSeconds = durationInSeconds;
                 }
-                """,
-            #endregion
 
-            #region Dispatcher Implementations
-            ["Dispatchers/CommandDispatcher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Dispatchers;
+                public int DurationInSeconds { get; }
 
-                using {{baseNamespace}}.Abstractions;
-                using {{baseNamespace}}.CQRS.Commands;
-                using {{baseNamespace}}.Pipelines;
+                public string? CacheKeyPrefix { get; init; }
+            }
+            """;
 
-                public class CommandDispatcher : ICommandDispatcher
+        files["Pipelines/Attributes/IdempotentAttribute.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Pipelines.Attributes;
+
+            [AttributeUsage(
+                AttributeTargets.Class,
+                AllowMultiple = false,
+                Inherited = true)]
+            public sealed class IdempotentAttribute : Attribute
+            {
+                public IdempotentAttribute(
+                    string? keyPrefix = null)
                 {
-                    private readonly IServiceProvider _serviceProvider;
-
-                    public CommandDispatcher(IServiceProvider serviceProvider)
-                    {
-                        _serviceProvider = serviceProvider;
-                    }
-
-                    public async ValueTask SendAsync<TCommand>(TCommand command, CancellationToken cancellationToken = default) where TCommand : ICommand
-                    {
-                        var handler = _serviceProvider.GetRequiredService<ICommandHandler<TCommand>>();
-                        var behaviors = _serviceProvider.GetServices<IPipelineBehavior<TCommand, CQRS.Common.Unit>>().Reverse().ToArray();
-
-                        Func<ValueTask<CQRS.Common.Unit>> pipeline = async () =>
-                        {
-                            await handler.HandleAsync(command, cancellationToken);
-                            return CQRS.Common.Unit.Value;
-                        };
-
-                        foreach (var behavior in behaviors)
-                        {
-                            var currentPipeline = pipeline;
-                            pipeline = () => behavior.HandleAsync(command, currentPipeline, cancellationToken);
-                        }
-
-                        await pipeline();
-                    }
-
-                    public async ValueTask<TResult> SendAsync<TCommand, TResult>(TCommand command, CancellationToken cancellationToken = default) where TCommand : ICommand<TResult>
-                    {
-                        var handler = _serviceProvider.GetRequiredService<ICommandHandler<TCommand, TResult>>();
-                        var behaviors = _serviceProvider.GetServices<IPipelineBehavior<TCommand, TResult>>().Reverse().ToArray();
-
-                        Func<ValueTask<TResult>> pipeline = () => handler.HandleAsync(command, cancellationToken);
-
-                        foreach (var behavior in behaviors)
-                        {
-                            var currentPipeline = pipeline;
-                            pipeline = () => behavior.HandleAsync(command, currentPipeline, cancellationToken);
-                        }
-
-                        return await pipeline();
-                    }
+                    KeyPrefix = keyPrefix;
                 }
-                """,
 
-            ["Dispatchers/QueryDispatcher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Dispatchers;
+                public string? KeyPrefix { get; init; }
 
-                using {{baseNamespace}}.Abstractions;
-                using {{baseNamespace}}.CQRS.Queries;
-                using {{baseNamespace}}.Pipelines;
+                public int ExpirationInSeconds { get; init; } = 86400;
+            }
+            """;
+    }
 
-                public class QueryDispatcher : IQueryDispatcher
-                {
-                    private readonly IServiceProvider _serviceProvider;
-
-                    public QueryDispatcher(IServiceProvider serviceProvider)
-                    {
-                        _serviceProvider = serviceProvider;
-                    }
-
-                    public async ValueTask SendAsync<TQuery>(TQuery query, CancellationToken cancellationToken = default) where TQuery : IQuery
-                    {
-                        var handler = _serviceProvider.GetRequiredService<IQueryHandler<TQuery>>();
-                        var behaviors = _serviceProvider.GetServices<IPipelineBehavior<TQuery, CQRS.Common.Unit>>().Reverse().ToArray();
-
-                        Func<ValueTask<CQRS.Common.Unit>> pipeline = async () =>
-                        {
-                            await handler.HandleAsync(query, cancellationToken);
-                            return CQRS.Common.Unit.Value;
-                        };
-
-                        foreach (var behavior in behaviors)
-                        {
-                            var currentPipeline = pipeline;
-                            pipeline = () => behavior.HandleAsync(query, currentPipeline, cancellationToken);
-                        }
-
-                        await pipeline();
-                    }
-
-                    public async ValueTask<TResult> SendAsync<TQuery, TResult>(TQuery query, CancellationToken cancellationToken = default) where TQuery : IQuery<TResult>
-                    {
-                        var handler = _serviceProvider.GetRequiredService<IQueryHandler<TQuery, TResult>>();
-                        var behaviors = _serviceProvider.GetServices<IPipelineBehavior<TQuery, TResult>>().Reverse().ToArray();
-
-                        Func<ValueTask<TResult>> pipeline = () => handler.HandleAsync(query, cancellationToken);
-
-                        foreach (var behavior in behaviors)
-                        {
-                            var currentPipeline = pipeline;
-                            pipeline = () => behavior.HandleAsync(query, currentPipeline, cancellationToken);
-                        }
-
-                        return await pipeline();
-                    }
-                }
-                """,
-
-            ["Dispatchers/EventPublisher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Dispatchers;
-
-                using {{baseNamespace}}.Abstractions;
-                using {{baseNamespace}}.CQRS.Events;
-
-                public class EventPublisher : IEventPublisher
-                {
-                    private readonly IServiceProvider _serviceProvider;
-
-                    public EventPublisher(IServiceProvider serviceProvider)
-                    {
-                        _serviceProvider = serviceProvider;
-                    }
-
-                    public async ValueTask PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IEvent
-                    {
-                        var handlers = _serviceProvider.GetServices<IEventHandler<TEvent>>();
-                        foreach (var handler in handlers)
-                        {
-                            await handler.HandleAsync(@event, cancellationToken);
-                        }
-                    }
-                }
-                """,
-
-            ["Dispatchers/ApplicationDispatcher.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Dispatchers;
-
-                using {{baseNamespace}}.Abstractions;
-                using {{baseNamespace}}.CQRS.Commands;
-                using {{baseNamespace}}.CQRS.Events;
-                using {{baseNamespace}}.CQRS.Queries;
-
-                public class ApplicationDispatcher : IApplicationDispatcher
-                {
-                    private readonly ICommandDispatcher _commandDispatcher;
-                    private readonly IQueryDispatcher _queryDispatcher;
-                    private readonly IEventPublisher _eventPublisher;
-
-                    public ApplicationDispatcher(
-                        ICommandDispatcher commandDispatcher,
-                        IQueryDispatcher queryDispatcher,
-                        IEventPublisher eventPublisher)
-                    {
-                        _commandDispatcher = commandDispatcher;
-                        _queryDispatcher = queryDispatcher;
-                        _eventPublisher = eventPublisher;
-                    }
-
-                    public ValueTask SendAsync<TCommand>(TCommand command, CancellationToken cancellationToken = default) where TCommand : ICommand
-                        => _commandDispatcher.SendAsync(command, cancellationToken);
-
-                    public ValueTask<TResult> SendAsync<TCommand, TResult>(TCommand command, CancellationToken cancellationToken = default) where TCommand : ICommand<TResult>
-                        => _commandDispatcher.SendAsync<TCommand, TResult>(command, cancellationToken);
-
-                    public ValueTask SendAsync<TQuery>(TQuery query, CancellationToken cancellationToken = default) where TQuery : IQuery
-                        => _queryDispatcher.SendAsync(query, cancellationToken);
-
-                    public ValueTask<TResult> SendAsync<TQuery, TResult>(TQuery query, CancellationToken cancellationToken = default) where TQuery : IQuery<TResult>
-                        => _queryDispatcher.SendAsync<TQuery, TResult>(query, cancellationToken);
-
-                    public ValueTask PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IEvent
-                        => _eventPublisher.PublishAsync(@event, cancellationToken);
-                }
-                """,
-            #endregion
-
-            #region Pipeline Behaviors Implementation
-            ["Pipelines/Behaviors/UnhandledExceptionBehavior.cs"] =
+    private static void AddBehaviorFiles(
+        Dictionary<string, string> files,
+        string baseNamespace,
+        ApplicationGenerationOptions options)
+    {
+        if (options.IncludeExceptionBehavior)
+        {
+            files["Pipelines/Behaviors/UnhandledExceptionBehavior.cs"] =
                 $$"""
                 namespace {{baseNamespace}}.Pipelines.Behaviors;
 
-                public class UnhandledExceptionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+                public sealed class UnhandledExceptionBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
                 {
-                    private readonly ILogger<UnhandledExceptionBehavior<TRequest, TResponse>> _logger;
+                    private readonly
+                        ILogger<UnhandledExceptionBehavior<TRequest, TResponse>>
+                        _logger;
 
-                    public UnhandledExceptionBehavior(ILogger<UnhandledExceptionBehavior<TRequest, TResponse>> logger)
+                    public UnhandledExceptionBehavior(
+                        ILogger<UnhandledExceptionBehavior<TRequest, TResponse>>
+                            logger)
                     {
                         _logger = logger;
                     }
 
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
                     {
                         try
                         {
                             return await next();
                         }
-                        catch (Exception ex)
+                        catch (OperationCanceledException)
+                            when (cancellationToken.IsCancellationRequested)
                         {
-                            var requestName = typeof(TRequest).Name;
-                            _logger.LogError(ex, "Application Request: Unhandled Exception for Request {Name} {@Request}", requestName, request);
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            _logger.LogError(
+                                exception,
+                                "Unhandled application exception. Request: {RequestType}",
+                                typeof(TRequest).FullName);
+
                             throw;
                         }
                     }
                 }
-                """,
+                """;
+        }
 
-            ["Pipelines/Behaviors/LoggingBehavior.cs"] =
+        if (options.IncludeLoggingBehavior)
+        {
+            files["Pipelines/Behaviors/LoggingBehavior.cs"] =
                 $$"""
                 namespace {{baseNamespace}}.Pipelines.Behaviors;
 
-                public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+                public sealed class LoggingBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
                 {
-                    private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
+                    private readonly
+                        ILogger<LoggingBehavior<TRequest, TResponse>>
+                        _logger;
 
-                    public LoggingBehavior(ILogger<LoggingBehavior<TRequest, TResponse>> logger)
+                    public LoggingBehavior(
+                        ILogger<LoggingBehavior<TRequest, TResponse>>
+                            logger)
                     {
                         _logger = logger;
                     }
 
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
                     {
-                        var requestName = typeof(TRequest).Name;
-                        _logger.LogInformation("Processing request {RequestName}: {@Request}", requestName, request);
+                        var requestType =
+                            typeof(TRequest).FullName
+                            ?? typeof(TRequest).Name;
 
-                        var response = await next();
+                        _logger.LogInformation(
+                            "Application request started: {RequestType}",
+                            requestType);
 
-                        _logger.LogInformation("Completed request {RequestName}", requestName);
-                        return response;
-                    }
-                }
-                """,
-
-            ["Pipelines/Behaviors/PerformanceBehavior.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines.Behaviors;
-
-                public class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-                {
-                    private readonly Stopwatch _timer = new();
-                    private readonly ILogger<PerformanceBehavior<TRequest, TResponse>> _logger;
-
-                    public PerformanceBehavior(ILogger<PerformanceBehavior<TRequest, TResponse>> logger)
-                    {
-                        _logger = logger;
-                    }
-
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
-                    {
-                        _timer.Start();
-
-                        var response = await next();
-
-                        _timer.Stop();
-
-                        var elapsedMilliseconds = _timer.ElapsedMilliseconds;
-
-                        if (elapsedMilliseconds > 500)
-                        {
-                            var requestName = typeof(TRequest).Name;
-                            _logger.LogWarning("Long Running Request: {Name} ({ElapsedMilliseconds} milliseconds) {@Request}",
-                                requestName, elapsedMilliseconds, request);
-                        }
-
-                        return response;
-                    }
-                }
-                """,
-
-            ["Pipelines/Behaviors/ValidationBehavior.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines.Behaviors;
-
-                public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-                {
-                    private readonly IEnumerable<IValidator<TRequest>> _validators;
-
-                    public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators)
-                    {
-                        _validators = validators;
-                    }
-
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
-                    {
-                        if (_validators.Any())
-                        {
-                            foreach (var validator in _validators)
-                            {
-                                await validator.ValidateAsync(request, cancellationToken);
-                            }
-                        }
-
-                        return await next();
-                    }
-                }
-                """,
-
-            ["Pipelines/Behaviors/AuthorizationBehavior.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines.Behaviors;
-
-                using {{baseNamespace}}.Abstractions;
-                using {{baseNamespace}}.Pipelines.Attributes;
-
-                public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-                {
-                    private readonly ICurrentUser _currentUser;
-
-                    public AuthorizationBehavior(ICurrentUser currentUser)
-                    {
-                        _currentUser = currentUser;
-                    }
-
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
-                    {
-                        var authorizeAttributes = typeof(TRequest).GetCustomAttributes<AuthorizeAttribute>().ToList();
-
-                        if (authorizeAttributes.Any())
-                        {
-                            if (!_currentUser.IsAuthenticated)
-                            {
-                                throw new UnauthorizedAccessException("User is not authenticated.");
-                            }
-
-                            foreach (var attr in authorizeAttributes)
-                            {
-                                if (!string.IsNullOrWhiteSpace(attr.Roles))
-                                {
-                                    var roles = attr.Roles.Split(',');
-                                    var hasRole = roles.Any(role => _currentUser.HasRole(role.Trim()));
-                                    if (!hasRole)
-                                    {
-                                        throw new UnauthorizedAccessException("User is not authorized to execute this request.");
-                                    }
-                                }
-                            }
-                        }
-
-                        return await next();
-                    }
-                }
-                """,
-
-            ["Pipelines/Behaviors/TransactionBehavior.cs"] =
-                $$"""
-                namespace {{baseNamespace}}.Pipelines.Behaviors;
-
-                using {{baseNamespace}}.Abstractions;
-
-                public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-                {
-                    private readonly ITransactionManager _transactionManager;
-
-                    public TransactionBehavior(ITransactionManager transactionManager)
-                    {
-                        _transactionManager = transactionManager;
-                    }
-
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
-                    {
                         try
                         {
-                            await _transactionManager.BeginAsync(cancellationToken);
                             var response = await next();
-                            await _transactionManager.CommitAsync(cancellationToken);
+
+                            _logger.LogInformation(
+                                "Application request completed: {RequestType}",
+                                requestType);
+
                             return response;
                         }
                         catch
                         {
-                            await _transactionManager.RollbackAsync(cancellationToken);
+                            _logger.LogWarning(
+                                "Application request failed: {RequestType}",
+                                requestType);
+
                             throw;
                         }
                     }
                 }
-                """,
+                """;
+        }
 
-            ["Pipelines/Behaviors/CachingBehavior.cs"] =
+        if (options.IncludePerformanceBehavior)
+        {
+            files["Pipelines/Behaviors/PerformanceBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                public sealed class PerformanceBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private const long DefaultWarningThresholdMilliseconds = 500;
+
+                    private readonly
+                        ILogger<PerformanceBehavior<TRequest, TResponse>>
+                        _logger;
+
+                    public PerformanceBehavior(
+                        ILogger<PerformanceBehavior<TRequest, TResponse>>
+                            logger)
+                    {
+                        _logger = logger;
+                    }
+
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        var started = Stopwatch.GetTimestamp();
+
+                        var response = await next();
+
+                        var elapsedMilliseconds =
+                            Stopwatch.GetElapsedTime(started)
+                                .TotalMilliseconds;
+
+                        if (elapsedMilliseconds >=
+                            DefaultWarningThresholdMilliseconds)
+                        {
+                            _logger.LogWarning(
+                                "Long-running application request: {RequestType}. " +
+                                "Elapsed: {ElapsedMilliseconds} ms",
+                                typeof(TRequest).FullName,
+                                elapsedMilliseconds);
+                        }
+
+                        return response;
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeValidationBehavior)
+        {
+            /*
+             * Validation is intentionally delegated to the
+             * BuildingBlocks.Validation package.
+             *
+             * The Application layer does not create a second validator system.
+             */
+            files["Pipelines/Behaviors/ValidationBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                /*
+                 * This behavior is intentionally kept as an integration point.
+                 *
+                 * The concrete validator abstraction must come from:
+                 *
+                 * {{baseNamespace.Replace(".Application", ".Validation")}}
+                 *
+                 * once the Validation BuildingBlock contract is finalized.
+                 *
+                 * Do not create another IValidator abstraction here.
+                 */
+
+                public sealed class ValidationBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    public ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        return next();
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeAuthorizationBehavior)
+        {
+            files["Pipelines/Behaviors/AuthorizationBehavior.cs"] =
                 $$"""
                 namespace {{baseNamespace}}.Pipelines.Behaviors;
 
                 using {{baseNamespace}}.Abstractions;
                 using {{baseNamespace}}.Pipelines.Attributes;
 
-                public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+                public sealed class AuthorizationBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
                 {
-                    private readonly ICacheService _cacheService;
+                    private readonly
+                        IAuthorizationService _authorizationService;
 
-                    public CachingBehavior(ICacheService cacheService)
+                    public AuthorizationBehavior(
+                        IAuthorizationService authorizationService)
                     {
-                        _cacheService = cacheService;
+                        _authorizationService =
+                            authorizationService;
                     }
 
-                    public async ValueTask<TResponse> HandleAsync(TRequest request, Func<ValueTask<TResponse>> next, CancellationToken cancellationToken = default)
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
                     {
-                        var cacheAttribute = typeof(TRequest).GetCustomAttribute<CacheableAttribute>();
-                        if (cacheAttribute == null)
+                        var attributes =
+                            typeof(TRequest)
+                                .GetCustomAttributes<AuthorizeAttribute>(
+                                    inherit: true)
+                                .ToArray();
+
+                        if (attributes.Length == 0)
                         {
                             return await next();
                         }
 
-                        var cacheKey = $"{cacheAttribute.CacheKeyPrefix ?? typeof(TRequest).Name}_{request.GetHashCode()}";
-                        var cachedResult = await _cacheService.GetAsync<TResponse>(cacheKey, cancellationToken);
-
-                        if (cachedResult != null)
+                        foreach (var attribute in attributes)
                         {
-                            return cachedResult;
-                        }
-
-                        var result = await next();
-                        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(cacheAttribute.DurationInSeconds), cancellationToken);
-
-                        return result;
-                    }
-                }
-                """,
-            #endregion
-
-            #region Extension Registration
-            ["Extensions/ApplicationServiceCollectionExtensions.cs"] =
-                $$"""
-                namespace Microsoft.Extensions.DependencyInjection;
-
-                using {{baseNamespace}}.Abstractions;
-                using {{baseNamespace}}.CQRS.Commands;
-                using {{baseNamespace}}.CQRS.Events;
-                using {{baseNamespace}}.CQRS.Queries;
-                using {{baseNamespace}}.Dispatchers;
-                using {{baseNamespace}}.Pipelines;
-                using {{baseNamespace}}.Pipelines.Behaviors;
-                using {{baseNamespace}}.Services;
-
-                public static class ApplicationServiceCollectionExtensions
-                {
-                    public static IServiceCollection AddApplicationServices(
-                        this IServiceCollection services, 
-                        Assembly[] assemblies)
-                    {
-                        // ثبت Infrastructure Services اولیه
-                        services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
-                        services.AddSingleton<IIdGenerator, GuidIdGenerator>();
-
-                        // ثبت Dispatcherها
-                        services.AddScoped<ICommandDispatcher, CommandDispatcher>();
-                        services.AddScoped<IQueryDispatcher, QueryDispatcher>();
-                        services.AddScoped<IEventPublisher, EventPublisher>();
-                        services.AddScoped<IApplicationDispatcher, ApplicationDispatcher>();
-
-                        // ثبت خودکار Handlerها
-                        services.ScanAndRegisterHandlers(assemblies);
-
-                        // ثبت Pipeline Behaviorهای اصلی به‌ترتیب اجرای بهینه
-                        if ({{includeException.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
-                        }
-                        if ({{includeLogging.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-                        }
-                        if ({{includePerformance.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
-                        }
-                        if ({{includeAuthorization.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
-                        }
-                        if ({{includeValidation.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-                        }
-                        if ({{includeCaching.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
-                        }
-                        if ({{includeTransaction.ToString().ToLower()}})
-                        {
-                            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
-                        }
-
-                        return services;
-                    }
-
-                    private static IServiceCollection ScanAndRegisterHandlers(this IServiceCollection services, Assembly[] assemblies)
-                    {
-                        foreach (var assembly in assemblies)
-                        {
-                            var types = assembly.GetTypes()
-                                .Where(t => t.IsClass && !t.IsAbstract)
-                                .ToList();
-
-                            foreach (var type in types)
+                            if (!string.IsNullOrWhiteSpace(attribute.Policy))
                             {
-                                var interfaces = type.GetInterfaces();
-                                foreach (var @interface in interfaces)
-                                {
-                                    if (!@interface.IsGenericType) continue;
+                                var allowed =
+                                    await _authorizationService
+                                        .AuthorizeAsync(
+                                            attribute.Policy,
+                                            cancellationToken);
 
-                                    var genericDef = @interface.GetGenericTypeDefinition();
-                                    if (genericDef == typeof(ICommandHandler<>) ||
-                                        genericDef == typeof(ICommandHandler<,>) ||
-                                        genericDef == typeof(IQueryHandler<,>) ||
-                                        genericDef == typeof(IEventHandler<>))
+                                if (!allowed)
+                                {
+                                    throw new UnauthorizedAccessException(
+                                        $"Authorization policy '{attribute.Policy}' failed.");
+                                }
+
+                                continue;
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(attribute.Roles))
+                            {
+                                var roles =
+                                    attribute.Roles
+                                        .Split(
+                                            ',',
+                                            StringSplitOptions.RemoveEmptyEntries |
+                                            StringSplitOptions.TrimEntries);
+
+                                foreach (var role in roles)
+                                {
+                                    var allowed =
+                                        await _authorizationService
+                                            .AuthorizeAsync(
+                                                role,
+                                                cancellationToken);
+
+                                    if (!allowed)
                                     {
-                                        services.AddScoped(@interface, type);
+                                        throw new UnauthorizedAccessException(
+                                            $"Authorization requirement '{role}' failed.");
                                     }
+                                }
+                            }
+                            else
+                            {
+                                var allowed =
+                                    await _authorizationService
+                                        .AuthorizeAsync(
+                                            null,
+                                            cancellationToken);
+
+                                if (!allowed)
+                                {
+                                    throw new UnauthorizedAccessException(
+                                        "Authorization failed.");
                                 }
                             }
                         }
 
-                        return services;
+                        return await next();
                     }
                 }
-                """
-            #endregion
-        };
+                """;
+        }
 
-        return files;
+        if (options.IncludeTransactionBehavior)
+        {
+            files["Pipelines/Behaviors/TransactionBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                using {{baseNamespace}}.Abstractions;
+
+                public sealed class TransactionBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private readonly ITransactionManager _transactionManager;
+
+                    public TransactionBehavior(
+                        ITransactionManager transactionManager)
+                    {
+                        _transactionManager =
+                            transactionManager;
+                    }
+
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        await _transactionManager.BeginAsync(
+                            cancellationToken);
+
+                        try
+                        {
+                            var response = await next();
+
+                            await _transactionManager.CommitAsync(
+                                cancellationToken);
+
+                            return response;
+                        }
+                        catch
+                        {
+                            try
+                            {
+                                await _transactionManager.RollbackAsync(
+                                    cancellationToken);
+                            }
+                            catch
+                            {
+                                // Never hide the original exception.
+                            }
+
+                            throw;
+                        }
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeCachingBehavior)
+        {
+            files["Pipelines/Behaviors/CachingBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                using System.Security.Cryptography;
+                using System.Text;
+                using System.Text.Json;
+                using {{baseNamespace}}.Abstractions;
+                using {{baseNamespace}}.Pipelines.Attributes;
+
+                public sealed class CachingBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private readonly ICacheService _cacheService;
+
+                    public CachingBehavior(
+                        ICacheService cacheService)
+                    {
+                        _cacheService = cacheService;
+                    }
+
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        var attribute =
+                            typeof(TRequest)
+                                .GetCustomAttribute<CacheableAttribute>();
+
+                        if (attribute is null)
+                        {
+                            return await next();
+                        }
+
+                        var key =
+                            CreateCacheKey(
+                                request,
+                                attribute);
+
+                        var cached =
+                            await _cacheService.GetAsync<TResponse>(
+                                key,
+                                cancellationToken);
+
+                        if (cached is not null)
+                        {
+                            return cached;
+                        }
+
+                        var result = await next();
+
+                        await _cacheService.SetAsync(
+                            key,
+                            result,
+                            TimeSpan.FromSeconds(
+                                attribute.DurationInSeconds),
+                            cancellationToken);
+
+                        return result;
+                    }
+
+                    private static string CreateCacheKey(
+                        TRequest request,
+                        CacheableAttribute attribute)
+                    {
+                        var json =
+                            JsonSerializer.Serialize(
+                                request,
+                                new JsonSerializerOptions
+                                {
+                                    PropertyNamingPolicy =
+                                        JsonNamingPolicy.CamelCase
+                                });
+
+                        var bytes =
+                            SHA256.HashData(
+                                Encoding.UTF8.GetBytes(json));
+
+                        var hash =
+                            Convert.ToHexString(bytes);
+
+                        var prefix =
+                            string.IsNullOrWhiteSpace(
+                                attribute.CacheKeyPrefix)
+                                ? typeof(TRequest).FullName
+                                : attribute.CacheKeyPrefix;
+
+                        return $"application:v1:{prefix}:{hash}";
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeRetryBehavior)
+        {
+            files["Pipelines/Behaviors/RetryBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                using {{baseNamespace}}.Abstractions;
+
+                public sealed class RetryBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private readonly IRetryPolicy _retryPolicy;
+
+                    public RetryBehavior(
+                        IRetryPolicy retryPolicy)
+                    {
+                        _retryPolicy = retryPolicy;
+                    }
+
+                    public ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        return _retryPolicy.ExecuteAsync(
+                            _ => next(),
+                            cancellationToken);
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeIdempotencyBehavior)
+        {
+            files["Pipelines/Behaviors/IdempotencyBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                using System.Security.Cryptography;
+                using System.Text;
+                using System.Text.Json;
+                using {{baseNamespace}}.Abstractions;
+                using {{baseNamespace}}.Pipelines.Attributes;
+
+                public sealed class IdempotencyBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private readonly IIdempotencyStore _store;
+
+                    public IdempotencyBehavior(
+                        IIdempotencyStore store)
+                    {
+                        _store = store;
+                    }
+
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        var attribute =
+                            typeof(TRequest)
+                                .GetCustomAttribute<IdempotentAttribute>();
+
+                        if (attribute is null)
+                        {
+                            return await next();
+                        }
+
+                        var key =
+                            CreateKey(
+                                request,
+                                attribute);
+
+                        if (await _store.ExistsAsync(
+                            key,
+                            cancellationToken))
+                        {
+                            throw new InvalidOperationException(
+                                $"The request has already been processed. Key: {key}");
+                        }
+
+                        var result = await next();
+
+                        await _store.StoreAsync(
+                            key,
+                            TimeSpan.FromSeconds(
+                                attribute.ExpirationInSeconds),
+                            cancellationToken);
+
+                        return result;
+                    }
+
+                    private static string CreateKey(
+                        TRequest request,
+                        IdempotentAttribute attribute)
+                    {
+                        var json =
+                            JsonSerializer.Serialize(request);
+
+                        var hash =
+                            Convert.ToHexString(
+                                SHA256.HashData(
+                                    Encoding.UTF8.GetBytes(json)));
+
+                        var prefix =
+                            string.IsNullOrWhiteSpace(
+                                attribute.KeyPrefix)
+                                ? typeof(TRequest).FullName
+                                : attribute.KeyPrefix;
+
+                        return $"idempotency:v1:{prefix}:{hash}";
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeAuditBehavior)
+        {
+            files["Pipelines/Behaviors/AuditBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                using {{baseNamespace}}.Abstractions;
+
+                public sealed class AuditBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private readonly IAuditWriter _auditWriter;
+
+                    public AuditBehavior(
+                        IAuditWriter auditWriter)
+                    {
+                        _auditWriter = auditWriter;
+                    }
+
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        var requestType =
+                            typeof(TRequest).FullName
+                            ?? typeof(TRequest).Name;
+
+                        var response = await next();
+
+                        await _auditWriter.WriteAsync(
+                            requestType,
+                            request,
+                            cancellationToken);
+
+                        return response;
+                    }
+                }
+                """;
+        }
+
+        if (options.IncludeRateLimitBehavior)
+        {
+            files["Pipelines/Behaviors/RateLimitBehavior.cs"] =
+                $$"""
+                namespace {{baseNamespace}}.Pipelines.Behaviors;
+
+                using {{baseNamespace}}.Abstractions;
+
+                public sealed class RateLimitBehavior<
+                    TRequest,
+                    TResponse> :
+                    IPipelineBehavior<TRequest, TResponse>
+                {
+                    private readonly IRateLimitService _rateLimitService;
+
+                    public RateLimitBehavior(
+                        IRateLimitService rateLimitService)
+                    {
+                        _rateLimitService =
+                            rateLimitService;
+                    }
+
+                    public async ValueTask<TResponse> HandleAsync(
+                        TRequest request,
+                        Func<ValueTask<TResponse>> next,
+                        CancellationToken cancellationToken = default)
+                    {
+                        var key =
+                            $"request:{typeof(TRequest).FullName}";
+
+                        var allowed =
+                            await _rateLimitService.IsAllowedAsync(
+                                key,
+                                cancellationToken);
+
+                        if (!allowed)
+                        {
+                            throw new InvalidOperationException(
+                                "Application request rate limit exceeded.");
+                        }
+
+                        return await next();
+                    }
+                }
+                """;
+        }
     }
+
+    private static void AddApplicationRegistrationFile(
+        Dictionary<string, string> files,
+        string baseNamespace,
+        ApplicationGenerationOptions options)
+    {
+        files["Extensions/ApplicationServiceCollectionExtensions.cs"] =
+            $$"""
+            namespace Microsoft.Extensions.DependencyInjection;
+
+            using {{baseNamespace}}.Abstractions;
+            using {{baseNamespace}}.CQRS.Commands;
+            using {{baseNamespace}}.CQRS.Events;
+            using {{baseNamespace}}.CQRS.Queries;
+            using {{baseNamespace}}.Dispatchers;
+            using {{baseNamespace}}.Pipelines;
+            using {{baseNamespace}}.Pipelines.Behaviors;
+
+            public static class ApplicationServiceCollectionExtensions
+            {
+                public static IServiceCollection AddApplicationServices(
+                    this IServiceCollection services,
+                    params Assembly[] assemblies)
+                {
+                    ArgumentNullException.ThrowIfNull(services);
+
+                    if (assemblies is null ||
+                        assemblies.Length == 0)
+                    {
+                        assemblies =
+                        [
+                            typeof(ApplicationServiceCollectionExtensions)
+                                .Assembly
+                        ];
+                    }
+
+                    services.AddScoped<
+                        ICommandDispatcher,
+                        CommandDispatcher>();
+
+                    services.AddScoped<
+                        IQueryDispatcher,
+                        QueryDispatcher>();
+
+                    services.AddScoped<
+                        IEventPublisher,
+                        EventPublisher>();
+
+                    services.AddScoped<
+                        IApplicationDispatcher,
+                        ApplicationDispatcher>();
+
+                    RegisterHandlers(
+                        services,
+                        assemblies);
+
+                    {{BuildBehaviorRegistrations(options)}}
+
+                    return services;
+                }
+
+                private static void RegisterHandlers(
+                    IServiceCollection services,
+                    IEnumerable<Assembly> assemblies)
+                {
+                    foreach (var assembly in assemblies.Distinct())
+                    {
+                        foreach (var type in GetLoadableTypes(assembly))
+                        {
+                            if (!type.IsClass ||
+                                type.IsAbstract ||
+                                type.IsGenericTypeDefinition)
+                            {
+                                continue;
+                            }
+
+                            foreach (var serviceType in type.GetInterfaces())
+                            {
+                                if (!serviceType.IsGenericType)
+                                {
+                                    continue;
+                                }
+
+                                var definition =
+                                    serviceType.GetGenericTypeDefinition();
+
+                                if (definition ==
+                                        typeof(ICommandHandler<>) ||
+                                    definition ==
+                                        typeof(ICommandHandler<,>) ||
+                                    definition ==
+                                        typeof(IQueryHandler<>) ||
+                                    definition ==
+                                        typeof(IQueryHandler<,>) ||
+                                    definition ==
+                                        typeof(IEventHandler<>))
+                                {
+                                    services.AddScoped(
+                                        serviceType,
+                                        type);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                private static IEnumerable<Type> GetLoadableTypes(
+                    Assembly assembly)
+                {
+                    try
+                    {
+                        return assembly.GetTypes();
+                    }
+                    catch (ReflectionTypeLoadException exception)
+                    {
+                        return exception.Types
+                            .Where(static type => type is not null)
+                            .Cast<Type>();
+                    }
+                }
+
+                private static void AddBehavior<TBehavior>(
+                    IServiceCollection services)
+                    where TBehavior : class
+                {
+                    services.AddScoped(
+                        typeof(IPipelineBehavior<,>),
+                        typeof(TBehavior));
+                }
+            }
+            """;
+
+        /*
+         * The generated registration method is assembled separately
+         * because feature flags are known at generation time.
+         */
+        files["Extensions/ApplicationBehaviorRegistration.cs"] =
+            $$"""
+            namespace {{baseNamespace}}.Extensions;
+
+            internal static class ApplicationBehaviorRegistration
+            {
+                internal static void Register(
+                    IServiceCollection services)
+                {
+                    {{BuildBehaviorRegistrations(options)}}
+                }
+            }
+            """;
+    }
+
+    private static void AddMinimalApplicationRegistrationFile(
+        Dictionary<string, string> files,
+        string baseNamespace)
+    {
+        files["Extensions/ApplicationServiceCollectionExtensions.cs"] =
+            $$"""
+            namespace Microsoft.Extensions.DependencyInjection;
+
+            using {{baseNamespace}}.Abstractions;
+
+            public static class ApplicationServiceCollectionExtensions
+            {
+                public static IServiceCollection AddApplicationServices(
+                    this IServiceCollection services)
+                {
+                    ArgumentNullException.ThrowIfNull(services);
+
+                    return services;
+                }
+            }
+            """;
+    }
+
+    private static string BuildBehaviorRegistrations(
+        ApplicationGenerationOptions options)
+    {
+        if (!options.IncludeBehaviors)
+        {
+            return string.Empty;
+        }
+
+        var lines = new List<string>();
+
+        if (options.IncludeExceptionBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(UnhandledExceptionBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeLoggingBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(LoggingBehavior<,>));
+                """);
+        }
+
+        if (options.IncludePerformanceBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(PerformanceBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeRateLimitBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(RateLimitBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeAuthorizationBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(AuthorizationBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeValidationBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(ValidationBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeIdempotencyBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(IdempotencyBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeCachingBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(CachingBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeTransactionBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(TransactionBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeRetryBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(RetryBehavior<,>));
+                """);
+        }
+
+        if (options.IncludeAuditBehavior)
+        {
+            lines.Add(
+                """
+                services.AddScoped(
+                    typeof(IPipelineBehavior<,>),
+                    typeof(AuditBehavior<,>));
+                """);
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            lines);
+    }
+}
+
+public sealed class ApplicationGenerationOptions
+{
+    public bool IncludeCqrs { get; init; }
+
+    public bool IncludeBehaviors { get; init; }
+
+    public bool IncludeLoggingBehavior { get; init; }
+
+    public bool IncludePerformanceBehavior { get; init; }
+
+    public bool IncludeExceptionBehavior { get; init; }
+
+    public bool IncludeValidationBehavior { get; init; }
+
+    public bool IncludeAuthorizationBehavior { get; init; }
+
+    public bool IncludeTransactionBehavior { get; init; }
+
+    public bool IncludeCachingBehavior { get; init; }
+
+    public bool IncludeRetryBehavior { get; init; }
+
+    public bool IncludeIdempotencyBehavior { get; init; }
+
+    public bool IncludeAuditBehavior { get; init; }
+
+    public bool IncludeRateLimitBehavior { get; init; }
 }
